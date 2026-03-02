@@ -13,20 +13,22 @@ export async function awardCredits(userId: string, amount: number, type: string,
 }
 
 export async function spendCredits(userId: string, amount: number, type: string, taskId?: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId } })
-  if (!user || user.credits < amount) {
-    throw new Error(`Insufficient credits. Balance: ${user?.credits ?? 0}, required: ${amount}`)
-  }
-
-  return prisma.$transaction([
-    prisma.user.update({
-      where: { id: userId },
+  return prisma.$transaction(async (tx) => {
+    // Atomic conditional update: only decrement if balance is sufficient
+    const result = await tx.user.updateMany({
+      where: { id: userId, credits: { gte: amount } },
       data: { credits: { decrement: amount } },
-    }),
-    prisma.creditTransaction.create({
+    })
+
+    if (result.count === 0) {
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { credits: true } })
+      throw new Error(`Insufficient credits. Balance: ${user?.credits ?? 0}, required: ${amount}`)
+    }
+
+    await tx.creditTransaction.create({
       data: { userId, amount: -amount, type, taskId },
-    }),
-  ])
+    })
+  })
 }
 
 export async function getBalance(userId: string): Promise<number> {
