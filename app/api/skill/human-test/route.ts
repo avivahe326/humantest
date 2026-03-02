@@ -5,6 +5,9 @@ import { spendCredits } from '@/lib/credits'
 import { generateTestPlan } from '@/lib/ai-test-plan'
 import { prisma } from '@/lib/prisma'
 import { withCors, corsOptionsResponse } from '@/lib/cors'
+import { RateLimiter, rateLimitResponse } from '@/lib/rate-limit'
+
+const skillApiLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 30 })
 
 export async function OPTIONS() {
   return corsOptionsResponse()
@@ -13,6 +16,11 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   const { user, error } = await requireApiKey(request)
   if (error) return withCors(error)
+
+  const rateLimit = skillApiLimiter.check(user!.id)
+  if (!rateLimit.allowed) {
+    return withCors(rateLimitResponse(rateLimit))
+  }
 
   try {
     const body = await request.json()

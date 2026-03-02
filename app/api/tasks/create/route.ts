@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/require-auth'
 import { createTaskSchema, isSafeTargetUrl } from '@/lib/validate'
-import { spendCredits } from '@/lib/credits'
+import { spendCredits, getBalance } from '@/lib/credits'
 import { generateTestPlan } from '@/lib/ai-test-plan'
 import { prisma } from '@/lib/prisma'
+import { RateLimiter, rateLimitResponse } from '@/lib/rate-limit'
+
+const createTaskLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 10 })
 
 export async function POST(request: NextRequest) {
   const { user, error } = await requireAuth()
   if (error) return error
+
+  const rateLimit = createTaskLimiter.check(user!.id)
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(rateLimit)
+  }
 
   try {
     const body = await request.json()
@@ -28,7 +36,8 @@ export async function POST(request: NextRequest) {
     try {
       await spendCredits(user!.id, totalCost, 'TASK_CREATION')
     } catch {
-      return NextResponse.json({ error: 'Insufficient credits', balance: 0 }, { status: 402 })
+      const balance = await getBalance(user!.id)
+      return NextResponse.json({ error: 'Insufficient credits', balance }, { status: 402 })
     }
 
     let requirements = data.requirements

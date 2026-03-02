@@ -3,8 +3,17 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { registerSchema } from '@/lib/validate'
+import { RateLimiter, getClientIp, rateLimitResponse } from '@/lib/rate-limit'
+
+const registerLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 5 })
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request)
+  const rateLimit = registerLimiter.check(ip)
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(rateLimit)
+  }
+
   try {
     const body = await request.json()
     const parsed = registerSchema.safeParse(body)
