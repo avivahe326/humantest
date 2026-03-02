@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/require-auth'
 import { prisma } from '@/lib/prisma'
 import { getBalance } from '@/lib/credits'
@@ -70,6 +71,13 @@ export async function POST(
     try {
       report = await generateReport(id)
     } catch (err) {
+      if (err instanceof Anthropic.APIConnectionTimeoutError) {
+        console.error('Report generation timeout for task:', id)
+        return NextResponse.json(
+          { error: 'AI report generation timed out, please retry later', reportError: true },
+          { status: 504 }
+        )
+      }
       console.error('Report generation error:', err)
       reportError = true
     }

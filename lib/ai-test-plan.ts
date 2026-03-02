@@ -20,22 +20,26 @@ export interface TestPlan {
 export async function generateTestPlan(
   url: string,
   focus?: string,
-  estimatedMinutes?: number
+  estimatedMinutes?: number,
+  timeoutMs: number = 30000
 ): Promise<TestPlan> {
   const minutes = estimatedMinutes || 10
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6-20250514',
-    max_tokens: 1024,
-    system: 'You are a UX research expert. Generate structured usability test plans. Always respond with valid JSON only, no markdown wrapping.',
-    messages: [
-      {
-        role: 'user',
-        content: `Generate a structured usability test plan for ${url}.${focus ? ` Focus: ${focus}.` : ''} Duration: ~${minutes} min. Return JSON: {"steps": [{"id": "step_1", "instruction": "...", "type": "open_text"}, ...], "nps": true, "estimatedMinutes": ${minutes}}. Steps should be specific actions a tester should take on the product. Generate 3-7 steps depending on complexity. Respond with JSON only.`,
-      },
-    ],
-    temperature: 0.7,
-  })
+  const response = await anthropic.messages.create(
+    {
+      model: 'claude-sonnet-4-6-20250514',
+      max_tokens: 1024,
+      system: 'You are a UX research expert. Generate structured usability test plans. Always respond with valid JSON only, no markdown wrapping.',
+      messages: [
+        {
+          role: 'user',
+          content: `Generate a structured usability test plan for ${url}.${focus ? ` Focus: ${focus}.` : ''} Duration: ~${minutes} min. Return JSON: {"steps": [{"id": "step_1", "instruction": "...", "type": "open_text"}, ...], "nps": true, "estimatedMinutes": ${minutes}}. Steps should be specific actions a tester should take on the product. Generate 3-7 steps depending on complexity. Respond with JSON only.`,
+        },
+      ],
+      temperature: 0.7,
+    },
+    { timeout: timeoutMs, maxRetries: 0 }
+  )
 
   const content = response.content[0]
   if (!content || content.type !== 'text') {

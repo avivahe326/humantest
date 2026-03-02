@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/require-auth'
 import { submitFeedbackSchema } from '@/lib/validate'
 import { awardCredits, getBalance } from '@/lib/credits'
@@ -23,7 +24,6 @@ export async function POST(
 
     const task = await prisma.task.findUnique({
       where: { id },
-      include: { _count: { select: { feedbacks: true } } },
     })
 
     if (!task) {
@@ -54,9 +54,9 @@ export async function POST(
     ]
     const textFeedback = textParts.join('\n\n')
 
-    // Save feedback and update claim
-    await prisma.$transaction([
-      prisma.feedback.create({
+    // Save feedback, update claim, and check completion atomically
+    const isLastSubmission = await prisma.$transaction(async (tx) => {
+      await tx.feedback.create({
         data: {
           taskId: id,
           claimId: claim.id,
@@ -66,28 +66,40 @@ export async function POST(
           audioUrl: data.audioUrl,
           rawData: data.rawData,
         },
-      }),
-      prisma.taskClaim.update({
+      })
+
+      await tx.taskClaim.update({
         where: { id: claim.id },
         data: { status: 'SUBMITTED' },
-      }),
-    ])
+      })
+
+      // Count submissions inside the transaction for atomicity
+      const submittedCount = await tx.feedback.count({ where: { taskId: id } })
+
+      if (submittedCount >= task.maxTesters) {
+        // Atomic: only update if still IN_PROGRESS (prevents double-completion)
+        const updated = await tx.task.updateMany({
+          where: { id, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+          data: { status: 'COMPLETED' },
+        })
+        return updated.count > 0
+      }
+      return false
+    })
 
     // Award credits immediately
     await awardCredits(user!.id, task.rewardPerTester, 'TASK_REWARD', id)
 
-    // Check if this is the last submission
-    const newSubmittedCount = task._count.feedbacks + 1
-    if (newSubmittedCount >= task.maxTesters) {
-      await prisma.task.update({
-        where: { id },
-        data: { status: 'COMPLETED' },
-      })
-      // Generate report (handles webhook internally)
+    // Generate report only if this transaction was the one to mark COMPLETED
+    if (isLastSubmission) {
       try {
-        await generateReport(id)
+        await generateReport(id, 120000)
       } catch (err) {
-        console.error('Report generation error:', err)
+        if (err instanceof Anthropic.APIConnectionTimeoutError) {
+          console.error('Report generation timeout (submit path) for task:', id)
+        } else {
+          console.error('Report generation error:', err)
+        }
       }
     }
 
