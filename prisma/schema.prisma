@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String             @id @default(cuid())
+  email        String             @unique
+  password     String
+  name         String?
+  apiKey       String             @unique
+  credits      Int                @default(100)
+  createdAt    DateTime           @default(now())
+  claims       TaskClaim[]
+  tasks        Task[]
+  feedbacks    Feedback[]
+  transactions CreditTransaction[]
+}
+
+model Task {
+  id               String     @id @default(cuid())
+  title            String     @db.VarChar(200)
+  description      String?    @db.Text
+  targetUrl        String     @db.VarChar(2000)
+  focus            String?    @db.Text
+  requirements     Json?
+  maxTesters       Int        @default(5)
+  rewardPerTester  Int        @default(20)
+  rewardType       String     @default("CREDITS")
+  estimatedMinutes Int        @default(10)
+  status           TaskStatus @default(OPEN)
+  webhookUrl       String?    @db.VarChar(2000)
+  creatorId        String
+  creator          User       @relation(fields: [creatorId], references: [id])
+  report           String?    @db.LongText
+  claimDeadline    DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  claims           TaskClaim[]
+  feedbacks        Feedback[]
+
+  @@index([status, createdAt])
+  @@index([creatorId])
+}
+
+model TaskClaim {
+  id        String      @id @default(cuid())
+  taskId    String
+  userId    String
+  status    ClaimStatus @default(IN_PROGRESS)
+  claimedAt DateTime    @default(now())
+  task      Task        @relation(fields: [taskId], references: [id])
+  user      User        @relation(fields: [userId], references: [id])
+  feedback  Feedback?
+
+  @@unique([taskId, userId])
+  @@index([userId])
+}
+
+model Feedback {
+  id           String   @id @default(cuid())
+  taskId       String
+  claimId      String   @unique
+  userId       String
+  textFeedback String?  @db.Text
+  screenRecUrl String?  @db.VarChar(2000)
+  audioUrl     String?  @db.VarChar(2000)
+  rawData      Json?
+  createdAt    DateTime @default(now())
+  task         Task     @relation(fields: [taskId], references: [id])
+  claim        TaskClaim @relation(fields: [claimId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model CreditTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  type      String
+  taskId    String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ClaimStatus {
+  IN_PROGRESS
+  SUBMITTED
+  ABANDONED
+}
