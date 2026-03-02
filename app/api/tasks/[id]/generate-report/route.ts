@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/require-auth'
 import { prisma } from '@/lib/prisma'
-import { refundCredits, getBalance } from '@/lib/credits'
+import { getBalance } from '@/lib/credits'
 import { generateReport } from '@/lib/ai-report'
 
 export async function POST(
@@ -13,53 +13,97 @@ export async function POST(
 
   const { id } = await params
 
-  const task = await prisma.task.findUnique({
-    where: { id },
-    include: {
-      _count: { select: { feedbacks: true } },
-    },
-  })
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Read task inside transaction
+      const task = await tx.task.findUnique({ where: { id } })
 
-  if (!task) {
-    return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+      if (!task) throw { appCode: 'NOT_FOUND' }
+      if (task.creatorId !== user!.id) throw { appCode: 'FORBIDDEN' }
+
+      // 2. Status check with retry support (F2)
+      if (task.status === 'CANCELLED') throw { appCode: 'CONFLICT', currentStatus: 'CANCELLED' }
+      if (task.status === 'COMPLETED' && task.report !== null) throw { appCode: 'REPORT_EXISTS' }
+
+      // Retry path: COMPLETED but report failed previously — skip state changes
+      if (task.status === 'COMPLETED' && task.report === null) {
+        return { refundAmount: 0 }
+      }
+
+      // 3. Count feedbacks inside transaction
+      const submittedCount = await tx.feedback.count({ where: { taskId: id } })
+      if (submittedCount < 1) throw { appCode: 'NO_SUBMISSIONS' }
+
+      // 4. Atomic conditional update: only complete if status is OPEN/IN_PROGRESS
+      const updated = await tx.task.updateMany({
+        where: { id, status: { in: ['OPEN', 'IN_PROGRESS'] }, creatorId: user!.id },
+        data: { status: 'COMPLETED' },
+      })
+
+      if (updated.count === 0) throw { appCode: 'CONFLICT' }
+
+      // 5. Abandon in-progress claims
+      await tx.taskClaim.updateMany({
+        where: { taskId: id, status: 'IN_PROGRESS' },
+        data: { status: 'ABANDONED' },
+      })
+
+      // 6. Calculate and execute refund inside transaction
+      const refundAmount = Math.max(0, task.rewardPerTester * (task.maxTesters - submittedCount))
+
+      if (refundAmount > 0) {
+        await tx.user.update({
+          where: { id: user!.id },
+          data: { credits: { increment: refundAmount } },
+        })
+        await tx.creditTransaction.create({
+          data: { userId: user!.id, amount: refundAmount, type: 'TASK_REFUND', taskId: id },
+        })
+      }
+
+      return { refundAmount }
+    }, { timeout: 10000 })
+
+    // Generate report outside transaction (AI API call is long-running)
+    let report = null
+    let reportError = false
+    try {
+      report = await generateReport(id)
+    } catch (err) {
+      console.error('Report generation error:', err)
+      reportError = true
+    }
+
+    const newBalance = await getBalance(user!.id)
+    return NextResponse.json({
+      report,
+      refunded: result.refundAmount,
+      newBalance,
+      ...(reportError && { reportError: true }),
+    })
+  } catch (err: any) {
+    if (err.appCode === 'NOT_FOUND') {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+    if (err.appCode === 'FORBIDDEN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    }
+    if (err.appCode === 'REPORT_EXISTS') {
+      return NextResponse.json({ error: 'Report already generated' }, { status: 400 })
+    }
+    if (err.appCode === 'NO_SUBMISSIONS') {
+      return NextResponse.json(
+        { error: 'At least 1 submission is required to generate a report' },
+        { status: 400 }
+      )
+    }
+    if (err.appCode === 'CONFLICT') {
+      return NextResponse.json(
+        { error: 'Task status conflict', currentStatus: err.currentStatus ?? null },
+        { status: 409 }
+      )
+    }
+    console.error('Generate report error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  if (task.creatorId !== user!.id) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
-  }
-
-  if (task.status === 'COMPLETED' || task.status === 'CANCELLED') {
-    return NextResponse.json({ error: 'Task is already completed or cancelled' }, { status: 400 })
-  }
-
-  const submittedCount = task._count.feedbacks
-  if (submittedCount < 1) {
-    return NextResponse.json({ error: 'At least 1 submission is required to generate a report' }, { status: 400 })
-  }
-
-  const refundAmount = task.rewardPerTester * (task.maxTesters - submittedCount)
-
-  // Abandon remaining claims and mark task completed
-  await prisma.$transaction([
-    prisma.taskClaim.updateMany({
-      where: { taskId: id, status: 'IN_PROGRESS' },
-      data: { status: 'ABANDONED' },
-    }),
-    prisma.task.update({
-      where: { id },
-      data: { status: 'COMPLETED' },
-    }),
-  ])
-
-  // Refund credits for non-submitted slots
-  if (refundAmount > 0) {
-    await refundCredits(user!.id, refundAmount, id)
-  }
-
-  // Generate report (handles webhook internally)
-  const report = await generateReport(id)
-
-  const newBalance = await getBalance(user!.id)
-
-  return NextResponse.json({ report, refunded: refundAmount, newBalance })
 }

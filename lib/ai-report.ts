@@ -87,8 +87,9 @@ Please generate a structured report with these sections:
   const content = response.content[0]
   const report = (content && content.type === 'text') ? content.text : 'Report generation failed.'
 
-  await prisma.task.update({
-    where: { id: taskId },
+  // Conditional update: only write if no report exists yet (prevents concurrent overwrites)
+  await prisma.task.updateMany({
+    where: { id: taskId, report: null },
     data: { report },
   })
 
