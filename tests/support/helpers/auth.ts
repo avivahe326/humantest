@@ -1,6 +1,20 @@
 import { APIRequestContext } from '@playwright/test';
 import { buildUser } from '../factories';
 
+let fakeIpCounter = 0;
+const workerSeed = process.pid;
+
+/** Generate a unique fake IP to bypass per-IP rate limiting in tests.
+ *  Uses process.pid + counter to ensure uniqueness across parallel workers. */
+function nextFakeIp(): string {
+  fakeIpCounter++;
+  const combined = workerSeed * 1000 + fakeIpCounter;
+  const a = (combined >> 16) & 0xff;
+  const b = (combined >> 8) & 0xff;
+  const c = combined & 0xff;
+  return `200.${a}.${b}.${c}`;
+}
+
 export type TestUser = {
   id: string;
   email: string;
@@ -13,14 +27,17 @@ export type TestUser = {
 
 /**
  * Register a new user via API and return their details including API key.
+ * Uses a unique X-Forwarded-For to avoid IP-based rate limiting in tests.
  */
 export async function registerUser(
   request: APIRequestContext,
   overrides: Record<string, unknown> = {},
 ): Promise<TestUser> {
   const userData = buildUser(overrides);
+  const fakeIp = nextFakeIp();
 
   const response = await request.post('/api/auth/register', {
+    headers: { 'X-Forwarded-For': fakeIp },
     data: {
       email: userData.email,
       name: userData.name,
@@ -35,15 +52,25 @@ export async function registerUser(
 
   const result = await response.json();
 
-  // Login to get session cookie
-  const loginResponse = await request.post('/api/auth/callback/credentials', {
+  // Login: first get CSRF token, then authenticate
+  const csrfRes = await request.get('/api/auth/csrf');
+  const { csrfToken } = await csrfRes.json();
+
+  await request.post('/api/auth/callback/credentials', {
     form: {
       email: userData.email,
       password: userData.password,
-      csrfToken: '',
+      csrfToken,
       json: 'true',
     },
   });
+
+  // Verify session is established
+  const sessionRes = await request.get('/api/auth/session');
+  const session = await sessionRes.json();
+  if (!session?.user) {
+    throw new Error(`Login failed: session not established for ${userData.email}`);
+  }
 
   return {
     id: result.userId,
@@ -53,6 +80,28 @@ export async function registerUser(
     credits: 100,
     plainPassword: userData.password,
   };
+}
+
+/**
+ * Login an existing user (no registration). Sets session cookie on the request context.
+ */
+export async function loginUser(
+  request: APIRequestContext,
+  email: string,
+  password: string,
+): Promise<void> {
+  const csrfRes = await request.get('/api/auth/csrf');
+  const { csrfToken } = await csrfRes.json();
+
+  await request.post('/api/auth/callback/credentials', {
+    form: { email, password, csrfToken, json: 'true' },
+  });
+
+  const sessionRes = await request.get('/api/auth/session');
+  const session = await sessionRes.json();
+  if (!session?.user) {
+    throw new Error(`Login failed: session not established for ${email}`);
+  }
 }
 
 /**
