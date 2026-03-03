@@ -146,7 +146,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim }: Tas
           </Link>
         )}
 
-        {isLoggedIn && !isCreator && !userClaim && task.spotsRemaining > 0 && task.status !== 'COMPLETED' && task.status !== 'CANCELLED' && (
+        {isLoggedIn && !userClaim && task.spotsRemaining > 0 && task.status !== 'COMPLETED' && task.status !== 'CANCELLED' && (
           <Button onClick={handleClaim} disabled={claiming}>
             {claiming ? 'Claiming...' : 'Claim This Task'}
           </Button>
