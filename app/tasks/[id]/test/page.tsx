@@ -61,7 +61,7 @@ export default function IntegratedTestPage() {
         const infoRes = await fetch(`/api/tasks/${taskId}/info`)
         if (!infoRes.ok) {
           if (!cancelled) {
-            setErrorMsg(infoRes.status === 404 ? '任务未找到' : '加载任务失败')
+            setErrorMsg(infoRes.status === 404 ? 'Task not found' : 'Failed to load task')
             setPhase('error')
           }
           return
@@ -76,7 +76,7 @@ export default function IntegratedTestPage() {
           if (!cancelled) setClaimId(existingClaimId)
         } else {
           if (!cancelled) {
-            setErrorMsg('你还未领取此任务，请返回任务详情页先领取')
+            setErrorMsg('You have not claimed this task yet. Please go back and claim it first.')
             setPhase('error')
           }
           return
@@ -104,7 +104,7 @@ export default function IntegratedTestPage() {
         if (!cancelled) setPhase('ready')
       } catch {
         if (!cancelled) {
-          setErrorMsg('加载失败，请重试')
+          setErrorMsg('Failed to load. Please try again.')
           setPhase('error')
         }
       }
@@ -210,7 +210,7 @@ export default function IntegratedTestPage() {
     return (
       <div className="mx-auto max-w-lg py-12 text-center space-y-4">
         <h1 className="text-xl font-bold text-red-500">{errorMsg}</h1>
-        <Button onClick={() => router.push(`/tasks/${taskId}`)}>返回任务详情</Button>
+        <Button onClick={() => router.push(`/tasks/${taskId}`)}>Back to Task</Button>
       </div>
     )
   }
@@ -225,34 +225,34 @@ export default function IntegratedTestPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              目标网站：<a href={task.targetUrl} target="_blank" rel="noopener noreferrer" className="underline text-primary">{task.targetUrl}</a>
+              Target website: <a href={task.targetUrl} target="_blank" rel="noopener noreferrer" className="underline text-primary">{task.targetUrl}</a>
             </p>
 
             <div className="rounded-lg border p-4 space-y-3">
-              <p className="text-sm font-medium">接下来将请求以下权限，用于记录你的测试过程：</p>
+              <p className="text-sm font-medium">The following permissions will be requested to record your testing session:</p>
               <div className="flex items-center gap-3 text-sm">
                 <Monitor className="h-5 w-5 text-muted-foreground" />
-                <span>屏幕录制</span>
+                <span>Screen Recording</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Mic className="h-5 w-5 text-muted-foreground" />
-                <span>麦克风录音</span>
+                <span>Microphone</span>
               </div>
             </div>
 
             {recorder.error === 'permission-denied' && (
-              <p className="text-sm text-red-500">权限被拒绝。请允许屏幕录制和麦克风权限后重试，或直接跳过录制。</p>
+              <p className="text-sm text-red-500">Permission denied. Please allow screen recording and microphone access, or skip recording.</p>
             )}
             {recorder.error === 'no-device' && (
-              <p className="text-sm text-red-500">未检测到可用设备，请检查你的麦克风设置。</p>
+              <p className="text-sm text-red-500">No recording device found. Please check your microphone settings.</p>
             )}
 
             <div className="flex gap-3">
               <Button onClick={handleStartRecording} className="flex-1">
-                开始测试
+                Start Testing
               </Button>
               <Button variant="outline" onClick={() => router.push(`/tasks/${taskId}/submit`)}>
-                跳过录制
+                Skip Recording
               </Button>
             </div>
           </CardContent>
@@ -280,21 +280,21 @@ export default function IntegratedTestPage() {
                 onClick={handleSwitchToFullscreen}
                 className="absolute bottom-3 left-3 text-xs text-muted-foreground underline hover:text-primary bg-background/80 px-2 py-1 rounded"
               >
-                iframe 无法加载？切换到全屏模式
+                Can&apos;t load iframe? Switch to fullscreen mode
               </button>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full space-y-4 p-8">
               <Monitor className="h-16 w-16 text-muted-foreground" />
-              <p className="text-lg font-medium">目标网站已在新标签页打开</p>
-              <p className="text-sm text-muted-foreground">请在新标签页中操作目标网站，录制会自动捕获你的屏幕</p>
+              <p className="text-lg font-medium">Target website opened in a new tab</p>
+              <p className="text-sm text-muted-foreground">Please interact with the target website in the new tab. Your screen is being recorded.</p>
               <a
                 href={task.targetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-primary underline"
               >
-                手动打开目标网站
+                Open target website manually
               </a>
             </div>
           )}
@@ -309,14 +309,14 @@ export default function IntegratedTestPage() {
               <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
             </span>
             <span className="font-mono text-lg font-bold">{mm}:{ss}</span>
-            <Badge variant="destructive" className="text-xs">录制中</Badge>
+            <Badge variant="destructive" className="text-xs">REC</Badge>
           </div>
 
           {/* Time warning */}
           {remainingMin < 2 && (
             <div className="flex items-center gap-2 text-yellow-500 text-sm">
               <AlertTriangle className="h-4 w-4" />
-              <span>剩余不到 {remainingMin > 0 ? `${remainingMin} 分钟` : '1 分钟'}，录制将自动停止</span>
+              <span>Less than {remainingMin > 0 ? `${remainingMin} min` : '1 min'} remaining. Recording will stop automatically.</span>
             </div>
           )}
 
@@ -324,7 +324,7 @@ export default function IntegratedTestPage() {
           {task.requirements?.steps && task.requirements.steps.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">测试步骤</CardTitle>
+                <CardTitle className="text-sm">Test Steps</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {task.requirements.steps.map((s: TestStep, i: number) => (
@@ -343,7 +343,7 @@ export default function IntegratedTestPage() {
             className="w-full mt-auto"
           >
             <Square className="h-4 w-4 mr-2" />
-            完成录制
+            Stop Recording
           </Button>
         </div>
       </div>
@@ -354,13 +354,13 @@ export default function IntegratedTestPage() {
   if (phase === 'uploading') {
     return (
       <div className="mx-auto max-w-md py-12 space-y-6 text-center">
-        <h2 className="text-lg font-bold">正在保存录制文件...</h2>
+        <h2 className="text-lg font-bold">Saving recording...</h2>
         <Progress value={recorder.uploadProgress} />
         <p className="text-sm text-muted-foreground">{recorder.uploadProgress}%</p>
         {recorder.error === 'upload-failed' && (
           <div className="space-y-2">
-            <p className="text-sm text-red-500">上传失败，请重试</p>
-            <Button onClick={handleUpload}>重试上传</Button>
+            <p className="text-sm text-red-500">Upload failed. Please try again.</p>
+            <Button onClick={handleUpload}>Retry Upload</Button>
           </div>
         )}
       </div>
@@ -372,8 +372,8 @@ export default function IntegratedTestPage() {
     return (
       <div className="mx-auto max-w-md py-12 space-y-4 text-center">
         <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
-        <h2 className="text-lg font-bold">录制完成！</h2>
-        <p className="text-sm text-muted-foreground">正在跳转到反馈表单...</p>
+        <h2 className="text-lg font-bold">Recording complete!</h2>
+        <p className="text-sm text-muted-foreground">Redirecting to feedback form...</p>
       </div>
     )
   }

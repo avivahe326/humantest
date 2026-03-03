@@ -289,14 +289,14 @@ export default function SubmitFeedbackPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label>Screen recording URL (optional)</Label>
-                {autoRecorded && screenRecUrl && <Badge variant="secondary">已自动录制</Badge>}
+                {autoRecorded && screenRecUrl && <Badge variant="secondary">Auto Recorded</Badge>}
               </div>
               <Input value={screenRecUrl} onChange={e => setScreenRecUrl(e.target.value)} placeholder="https://www.loom.com/..." readOnly={autoRecorded && !!screenRecUrl} className={autoRecorded && screenRecUrl ? 'opacity-70' : ''} />
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label>Audio feedback URL (optional)</Label>
-                {autoRecorded && audioUrl && <Badge variant="secondary">已自动录制</Badge>}
+                {autoRecorded && audioUrl && <Badge variant="secondary">Auto Recorded</Badge>}
               </div>
               <Input value={audioUrl} onChange={e => setAudioUrl(e.target.value)} placeholder="https://..." readOnly={autoRecorded && !!audioUrl} className={autoRecorded && audioUrl ? 'opacity-70' : ''} />
             </div>
