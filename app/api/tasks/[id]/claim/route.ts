@@ -20,10 +20,6 @@ export async function POST(
     return NextResponse.json({ error: 'Task is no longer accepting claims' }, { status: 410 })
   }
 
-  if (task.creatorId === user!.id) {
-    return NextResponse.json({ error: 'Cannot claim your own task' }, { status: 403 })
-  }
-
   // Check spots remaining
   const claimCount = await prisma.taskClaim.count({ where: { taskId: id } })
   if (claimCount >= task.maxTesters) {
