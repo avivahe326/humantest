@@ -40,6 +40,7 @@ async function getOssClient(): Promise<OSS> {
     accessKeyId: creds.AccessKeyId,
     accessKeySecret: creds.AccessKeySecret,
     stsToken: creds.SecurityToken,
+    secure: true,
     refreshSTSToken: async () => {
       const newCreds = await fetchSTSFromMetadata()
       credentialsExpiry = new Date(newCreds.Expiration).getTime()
