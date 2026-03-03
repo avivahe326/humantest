@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Slider } from '@/components/ui/slider'
 import Link from 'next/link'
+import { Badge } from '@/components/ui/badge'
 
 interface TestStep {
   id: string
@@ -46,11 +47,42 @@ export default function SubmitFeedbackPage() {
   const [worst, setWorst] = useState('')
   const [screenRecUrl, setScreenRecUrl] = useState('')
   const [audioUrl, setAudioUrl] = useState('')
+  const [autoRecorded, setAutoRecorded] = useState(false)
 
   const storageKey = STORAGE_KEY_PREFIX + taskId
 
-  // Load draft from localStorage
+  // Load recording URLs from sessionStorage (priority) or query params (fallback), then draft from localStorage
   useEffect(() => {
+    // 1. Check sessionStorage (coming from recording page)
+    const recordingKey = `recording-urls-${taskId}`
+    const recording = sessionStorage.getItem(recordingKey)
+    let fromRecording = false
+    if (recording) {
+      try {
+        const { screenRecUrl: sUrl, audioUrl: aUrl } = JSON.parse(recording)
+        if (sUrl) { setScreenRecUrl(sUrl); fromRecording = true }
+        if (aUrl) { setAudioUrl(aUrl); fromRecording = true }
+        if (fromRecording) setAutoRecorded(true)
+      } catch {
+        // Corrupted sessionStorage value, ignore
+      }
+      sessionStorage.removeItem(recordingKey)
+      if (fromRecording) return
+    }
+
+    // 1b. Fallback: check URL query params (sessionStorage write failure fallback)
+    const urlParams = new URLSearchParams(window.location.search)
+    const qScreen = urlParams.get('screenRecUrl')
+    const qAudio = urlParams.get('audioUrl')
+    if (qScreen || qAudio) {
+      if (qScreen) setScreenRecUrl(qScreen)
+      if (qAudio) setAudioUrl(qAudio)
+      setAutoRecorded(true)
+      window.history.replaceState({}, '', window.location.pathname)
+      return
+    }
+
+    // 2. Otherwise restore from localStorage draft (existing logic)
     try {
       const draft = localStorage.getItem(storageKey)
       if (draft) {
@@ -60,18 +92,20 @@ export default function SubmitFeedbackPage() {
         if (parsed.nps) setNps(parsed.nps)
         if (parsed.best) setBest(parsed.best)
         if (parsed.worst) setWorst(parsed.worst)
+        if (parsed.screenRecUrl) setScreenRecUrl(parsed.screenRecUrl)
+        if (parsed.audioUrl) setAudioUrl(parsed.audioUrl)
       }
     } catch {}
-  }, [storageKey])
+  }, [storageKey, taskId])
 
   // Save draft to localStorage
   useEffect(() => {
     if (!success) {
       try {
-        localStorage.setItem(storageKey, JSON.stringify({ firstImpression, stepAnswers, nps, best, worst }))
+        localStorage.setItem(storageKey, JSON.stringify({ firstImpression, stepAnswers, nps, best, worst, screenRecUrl, audioUrl }))
       } catch {}
     }
-  }, [firstImpression, stepAnswers, nps, best, worst, success, storageKey])
+  }, [firstImpression, stepAnswers, nps, best, worst, screenRecUrl, audioUrl, success, storageKey])
 
   // Fetch task info
   useEffect(() => {
@@ -253,12 +287,18 @@ export default function SubmitFeedbackPage() {
               <Textarea value={worst} onChange={e => setWorst(e.target.value)} placeholder="What was confusing or could be improved?" rows={3} />
             </div>
             <div className="space-y-2">
-              <Label>Screen recording URL (optional)</Label>
-              <Input value={screenRecUrl} onChange={e => setScreenRecUrl(e.target.value)} placeholder="https://www.loom.com/..." />
+              <div className="flex items-center gap-2">
+                <Label>Screen recording URL (optional)</Label>
+                {autoRecorded && screenRecUrl && <Badge variant="secondary">已自动录制</Badge>}
+              </div>
+              <Input value={screenRecUrl} onChange={e => setScreenRecUrl(e.target.value)} placeholder="https://www.loom.com/..." readOnly={autoRecorded && !!screenRecUrl} className={autoRecorded && screenRecUrl ? 'opacity-70' : ''} />
             </div>
             <div className="space-y-2">
-              <Label>Audio feedback URL (optional)</Label>
-              <Input value={audioUrl} onChange={e => setAudioUrl(e.target.value)} placeholder="https://..." />
+              <div className="flex items-center gap-2">
+                <Label>Audio feedback URL (optional)</Label>
+                {autoRecorded && audioUrl && <Badge variant="secondary">已自动录制</Badge>}
+              </div>
+              <Input value={audioUrl} onChange={e => setAudioUrl(e.target.value)} placeholder="https://..." readOnly={autoRecorded && !!audioUrl} className={autoRecorded && audioUrl ? 'opacity-70' : ''} />
             </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(2)}>Back</Button>

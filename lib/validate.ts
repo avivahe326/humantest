@@ -18,6 +18,13 @@ export const createTaskSchema = z.object({
   webhookUrl: z.url().optional(),
 })
 
+const httpsUrlSchema = z.url().refine(
+  (url) => {
+    try { return new URL(url).protocol === 'https:' } catch { return false }
+  },
+  { message: 'URL must use HTTPS protocol' }
+)
+
 export const submitFeedbackSchema = z.object({
   rawData: z.object({
     firstImpression: z.string().min(1).max(5000),
@@ -29,8 +36,8 @@ export const submitFeedbackSchema = z.object({
     best: z.string().max(5000),
     worst: z.string().max(5000),
   }),
-  screenRecUrl: z.url().optional(),
-  audioUrl: z.url().optional(),
+  screenRecUrl: httpsUrlSchema.optional(),
+  audioUrl: httpsUrlSchema.optional(),
 })
 
 const PRIVATE_IP_PATTERNS = [

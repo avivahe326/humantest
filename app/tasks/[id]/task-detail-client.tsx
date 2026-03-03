@@ -153,9 +153,14 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim }: Tas
         )}
 
         {userClaim?.status === 'IN_PROGRESS' && (
-          <Link href={`/tasks/${task.id}/submit`}>
-            <Button>Submit Feedback</Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href={`/tasks/${task.id}/test`}>
+              <Button>开始测试</Button>
+            </Link>
+            <Link href={`/tasks/${task.id}/submit`}>
+              <Button variant="outline">直接提交反馈</Button>
+            </Link>
+          </div>
         )}
 
         {userClaim?.status === 'SUBMITTED' && (
