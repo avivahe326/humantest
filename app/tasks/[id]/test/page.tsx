@@ -238,6 +238,7 @@ export default function IntegratedTestPage() {
                 <Mic className="h-5 w-5 text-muted-foreground" />
                 <span>Microphone</span>
               </div>
+              <p className="text-xs text-muted-foreground">On macOS, you may need to grant Screen Recording and Microphone permissions in System Settings. Chrome may require a restart after granting.</p>
             </div>
 
             {recorder.error === 'permission-denied' && (
