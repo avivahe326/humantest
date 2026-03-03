@@ -24,6 +24,8 @@ interface TaskInfo {
 
 type Phase = 'loading' | 'error' | 'ready' | 'recording' | 'uploading' | 'done'
 
+const IFRAME_BASE_WIDTH = 1280
+
 export default function IntegratedTestPage() {
   const { data: session, status: authStatus } = useSession()
   const router = useRouter()
@@ -37,6 +39,9 @@ export default function IntegratedTestPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [useFullscreen, setUseFullscreen] = useState(false)
   const uploadTriggeredRef = useRef(false)
+  const iframeContainerRef = useRef<HTMLDivElement>(null)
+  const [iframeScale, setIframeScale] = useState(1)
+  const [containerHeight, setContainerHeight] = useState(0)
 
   const recorder = useMediaRecorder({
     maxDurationMs: 15 * 60 * 1000,
@@ -124,6 +129,20 @@ export default function IntegratedTestPage() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [phase])
 
+  // iframe dynamic scaling via ResizeObserver
+  useEffect(() => {
+    if (phase !== 'recording') return
+    const el = iframeContainerRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect
+      setIframeScale(Math.min(width / IFRAME_BASE_WIDTH, 1))
+      setContainerHeight(height)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [phase])
+
   // Watch recorder status transitions (F9: guard against double upload)
   useEffect(() => {
     if (recorder.status === 'recording' && phase !== 'recording') {
@@ -160,8 +179,8 @@ export default function IntegratedTestPage() {
     try {
       await recorder.uploadRecordings(taskId, claimId)
     } catch {
-      // Error handled in hook, phase stays at uploading or reverts
-      setPhase('recording')
+      // Error handled in hook - phase stays at 'uploading', recorder.error = 'upload-failed'
+      // Existing retry UI in uploading phase will be visible
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, claimId])
@@ -194,6 +213,12 @@ export default function IntegratedTestPage() {
       // Will show manual link in UI
     }
   }, [task])
+
+  const handleSkipUpload = useCallback(() => {
+    if (window.confirm('录制将不会被保存，确定跳过？')) {
+      router.push(`/tasks/${taskId}/submit`)
+    }
+  }, [router, taskId])
 
   const remainingMs = 15 * 60 * 1000 - recorder.duration
   const remainingMin = Math.floor(remainingMs / 60000)
@@ -269,12 +294,20 @@ export default function IntegratedTestPage() {
     return (
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Left: iframe or fullscreen prompt */}
-        <div className="flex-1 relative">
+        <div ref={iframeContainerRef} className="flex-1 relative overflow-hidden bg-muted/30">
           {!isFullscreen ? (
             <>
               <iframe
                 src={task.targetUrl}
-                className="w-full h-full border-0"
+                className="absolute top-0 border-0"
+                style={{
+                  width: `${IFRAME_BASE_WIDTH}px`,
+                  height: containerHeight > 0 ? `${Math.round(containerHeight / iframeScale)}px` : '100%',
+                  transform: `scale(${iframeScale})`,
+                  transformOrigin: '0 0',
+                  left: iframeScale < 1 ? 0 : '50%',
+                  marginLeft: iframeScale < 1 ? 0 : `-${IFRAME_BASE_WIDTH / 2}px`,
+                }}
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               />
               <button
@@ -361,7 +394,16 @@ export default function IntegratedTestPage() {
         {recorder.error === 'upload-failed' && (
           <div className="space-y-2">
             <p className="text-sm text-red-500">Upload failed. Please try again.</p>
-            <Button onClick={handleUpload}>Retry Upload</Button>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={handleUpload}>Retry Upload</Button>
+              <Button
+                variant="outline"
+                aria-label="跳过上传，直接提交反馈"
+                onClick={handleSkipUpload}
+              >
+                Skip Upload
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -375,6 +417,9 @@ export default function IntegratedTestPage() {
         <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
         <h2 className="text-lg font-bold">Recording complete!</h2>
         <p className="text-sm text-muted-foreground">Redirecting to feedback form...</p>
+        <Button variant="link" onClick={() => router.push(`/tasks/${taskId}/submit`)}>
+          如果没有自动跳转，点击这里
+        </Button>
       </div>
     )
   }
