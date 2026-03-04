@@ -110,11 +110,15 @@ Please generate a structured report with these sections:
 
 export function startReportGeneration(taskId: string): void {
   // Atomically set GENERATING — prevents concurrent runs
+  // NOTE: Prisma + MySQL `{ not: 'X' }` excludes NULLs, so list accepted values explicitly
   prisma.task.updateMany({
     where: {
       id: taskId,
-      reportStatus: { not: 'GENERATING' },
       report: null,
+      OR: [
+        { reportStatus: null },
+        { reportStatus: { in: ['FAILED', 'COMPLETED'] } },
+      ],
     },
     data: { reportStatus: 'GENERATING' },
   }).then((result) => {
