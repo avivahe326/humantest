@@ -51,23 +51,31 @@ export default function SubmitFeedbackPage() {
 
   const storageKey = STORAGE_KEY_PREFIX + taskId
 
-  // Load recording URLs from sessionStorage (priority) or query params (fallback), then draft from localStorage
+  // Load recording URLs from sessionStorage (priority), localStorage, query params, then draft
   useEffect(() => {
     // 1. Check sessionStorage (coming from recording page)
     const recordingKey = `recording-urls-${taskId}`
-    const recording = sessionStorage.getItem(recordingKey)
     let fromRecording = false
-    if (recording) {
+
+    const tryLoadRecordingUrls = (storage: Storage) => {
+      const data = storage.getItem(recordingKey)
+      if (!data) return false
       try {
-        const { screenRecUrl: sUrl, audioUrl: aUrl } = JSON.parse(recording)
-        if (sUrl) { setScreenRecUrl(sUrl); fromRecording = true }
-        if (aUrl) { setAudioUrl(aUrl); fromRecording = true }
-        if (fromRecording) setAutoRecorded(true)
-      } catch {
-        // Corrupted sessionStorage value, ignore
-      }
-      sessionStorage.removeItem(recordingKey)
-      if (fromRecording) return
+        const { screenRecUrl: sUrl, audioUrl: aUrl } = JSON.parse(data)
+        let found = false
+        if (sUrl) { setScreenRecUrl(sUrl); found = true }
+        if (aUrl) { setAudioUrl(aUrl); found = true }
+        if (found) setAutoRecorded(true)
+        return found
+      } catch { return false }
+    }
+
+    // Try sessionStorage first, then localStorage
+    fromRecording = tryLoadRecordingUrls(sessionStorage) || tryLoadRecordingUrls(localStorage)
+    if (fromRecording) {
+      try { sessionStorage.removeItem(recordingKey) } catch {}
+      try { localStorage.removeItem(recordingKey) } catch {}
+      return
     }
 
     // 1b. Fallback: check URL query params (sessionStorage write failure fallback)

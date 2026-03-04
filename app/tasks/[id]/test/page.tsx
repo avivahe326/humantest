@@ -157,8 +157,12 @@ export default function IntegratedTestPage() {
       screenRecUrl: recorder.screenRecUrl,
       audioUrl: recorder.audioUrl,
     }
+    // Save to both sessionStorage and localStorage for reliability
     try {
       sessionStorage.setItem(`recording-urls-${taskId}`, JSON.stringify(urls))
+    } catch {}
+    try {
+      localStorage.setItem(`recording-urls-${taskId}`, JSON.stringify(urls))
     } catch {
       const params = new URLSearchParams()
       if (urls.screenRecUrl) params.set('screenRecUrl', urls.screenRecUrl)
