@@ -125,7 +125,7 @@ export default function SubmitFeedbackPage() {
   if (!session) { router.push('/login'); return null }
   if (!task) return <div className="py-12 text-center text-red-500">{error || 'Task not found'}</div>
 
-  const testSteps = task.requirements?.steps || []
+  const totalSteps = 2
 
   function updateStepAnswer(stepId: string, answer: string) {
     setStepAnswers(prev => ({ ...prev, [stepId]: answer }))
@@ -142,7 +142,7 @@ export default function SubmitFeedbackPage() {
         body: JSON.stringify({
           rawData: {
             firstImpression,
-            steps: testSteps.map(s => ({ id: s.id, answer: stepAnswers[s.id] || '' })),
+            steps: [],
             nps,
             best,
             worst,
@@ -194,10 +194,10 @@ export default function SubmitFeedbackPage() {
 
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
-          <span>Step {step} of 3</span>
-          <span>{Math.round((step / 3) * 100)}%</span>
+          <span>Step {step} of {totalSteps}</span>
+          <span>{Math.round((step / totalSteps) * 100)}%</span>
         </div>
-        <Progress value={(step / 3) * 100} />
+        <Progress value={(step / totalSteps) * 100} />
       </div>
 
       {error && <p className="text-sm text-red-500">{error}</p>}
@@ -227,39 +227,11 @@ export default function SubmitFeedbackPage() {
         </Card>
       )}
 
-      {/* Step 2: Task Experience */}
+      {/* Step 2: Summary */}
       {step === 2 && (
         <Card>
           <CardHeader>
-            <CardTitle>Step 2: Task Experience</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {testSteps.map((s, i) => (
-              <div key={s.id} className="space-y-2">
-                <Label className="font-medium">
-                  {i + 1}. {s.instruction}
-                </Label>
-                <Textarea
-                  value={stepAnswers[s.id] || ''}
-                  onChange={e => updateStepAnswer(s.id, e.target.value)}
-                  placeholder="Your answer..."
-                  rows={3}
-                />
-              </div>
-            ))}
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={() => setStep(3)}>Next</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 3: Summary */}
-      {step === 3 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Step 3: Summary</CardTitle>
+            <CardTitle>Step 2: Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -301,7 +273,7 @@ export default function SubmitFeedbackPage() {
               <Input value={audioUrl} onChange={e => setAudioUrl(e.target.value)} placeholder="https://..." readOnly={autoRecorded && !!audioUrl} className={autoRecorded && audioUrl ? 'opacity-70' : ''} />
             </div>
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
               <Button onClick={handleSubmit} disabled={submitting || !best.trim() || !worst.trim()}>
                 {submitting ? 'Submitting...' : 'Submit Feedback'}
               </Button>
