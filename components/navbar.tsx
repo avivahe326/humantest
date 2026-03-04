@@ -1,22 +1,33 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 
 export function Navbar() {
   const { data: session, status } = useSession()
   const [credits, setCredits] = useState<number | null>(null)
+  const pathname = usePathname()
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetch('/api/credits/balance')
-        .then(res => res.json())
-        .then(data => setCredits(data.credits))
-        .catch(() => {})
-    }
+  const fetchCredits = useCallback(() => {
+    if (!session?.user?.id) return
+    fetch('/api/credits/balance')
+      .then(res => res.json())
+      .then(data => setCredits(data.credits))
+      .catch(() => {})
   }, [session?.user?.id])
+
+  // Fetch on session change and route change
+  useEffect(() => { fetchCredits() }, [fetchCredits, pathname])
+
+  // Refetch when page becomes visible
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchCredits() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [fetchCredits])
 
   return (
     <nav className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
