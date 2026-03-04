@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/require-auth'
 import { prisma } from '@/lib/prisma'
 import { getBalance } from '@/lib/credits'
-import { generateReport } from '@/lib/ai-report'
+import { startReportGeneration } from '@/lib/ai-report'
 
 export async function POST(
   request: NextRequest,
@@ -66,28 +65,38 @@ export async function POST(
     }, { timeout: 10000 })
 
     // Generate report outside transaction (AI API call is long-running)
-    let report = null
-    let reportError = false
-    try {
-      report = await generateReport(id)
-    } catch (err) {
-      if (err instanceof Anthropic.APIConnectionTimeoutError) {
-        console.error('Report generation timeout for task:', id)
-        return NextResponse.json(
-          { error: 'AI report generation timed out, please retry later', reportError: true },
-          { status: 504 }
-        )
+    // Check if already generating
+    const currentTask = await prisma.task.findUnique({
+      where: { id },
+      select: { reportStatus: true, updatedAt: true },
+    })
+
+    if (currentTask?.reportStatus === 'GENERATING') {
+      const ageMs = Date.now() - currentTask.updatedAt.getTime()
+      if (ageMs < 5 * 60 * 1000) {
+        // Still fresh — don't start another run
+        const newBalance = await getBalance(user!.id)
+        return NextResponse.json({
+          error: 'Report is already being generated',
+          reportStatus: 'GENERATING',
+          refunded: result.refundAmount,
+          newBalance,
+        }, { status: 409 })
       }
-      console.error('Report generation error:', err)
-      reportError = true
+      // Stale — reset to FAILED so startReportGeneration can re-acquire
+      await prisma.task.update({
+        where: { id },
+        data: { reportStatus: 'FAILED' },
+      })
     }
+
+    startReportGeneration(id)  // fire-and-forget
 
     const newBalance = await getBalance(user!.id)
     return NextResponse.json({
-      report,
+      started: true,
       refunded: result.refundAmount,
       newBalance,
-      ...(reportError && { reportError: true }),
     })
   } catch (err: any) {
     if (err.appCode === 'NOT_FOUND') {

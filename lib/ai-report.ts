@@ -93,7 +93,7 @@ Please generate a structured report with these sections:
   // Conditional update: only write if no report exists yet (prevents concurrent overwrites)
   await prisma.task.updateMany({
     where: { id: taskId, report: null },
-    data: { report },
+    data: { report, reportStatus: 'COMPLETED' },
   })
 
   // Fire webhook if configured
@@ -106,4 +106,30 @@ Please generate a structured report with these sections:
   }
 
   return report
+}
+
+export function startReportGeneration(taskId: string): void {
+  // Atomically set GENERATING — prevents concurrent runs
+  prisma.task.updateMany({
+    where: {
+      id: taskId,
+      reportStatus: { not: 'GENERATING' },
+      report: null,
+    },
+    data: { reportStatus: 'GENERATING' },
+  }).then((result) => {
+    if (result.count === 0) {
+      console.log('Report generation already in progress or report exists for task:', taskId)
+      return
+    }
+    return generateReport(taskId)
+  }).catch((err) => {
+    console.error('Report generation failed for task:', taskId, err)
+    prisma.task.update({
+      where: { id: taskId },
+      data: { reportStatus: 'FAILED' },
+    }).catch((updateErr) => {
+      console.error('Failed to set FAILED status for task:', taskId, updateErr)
+    })
+  })
 }

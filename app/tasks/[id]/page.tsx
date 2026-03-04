@@ -44,6 +44,7 @@ export default async function TaskDetailPage({
         estimatedMinutes: task.estimatedMinutes,
         status: task.status,
         report: task.report,
+        reportStatus: task.reportStatus,
         createdAt: task.createdAt.toISOString(),
         claimedCount: task._count.claims,
         submittedCount: task._count.feedbacks,

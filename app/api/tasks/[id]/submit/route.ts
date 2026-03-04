@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/require-auth'
 import { submitFeedbackSchema } from '@/lib/validate'
 import { awardCredits, getBalance } from '@/lib/credits'
 import { prisma } from '@/lib/prisma'
-import { generateReport } from '@/lib/ai-report'
+import { startReportGeneration } from '@/lib/ai-report'
 
 export async function POST(
   request: NextRequest,
@@ -92,15 +91,7 @@ export async function POST(
 
     // Generate report only if this transaction was the one to mark COMPLETED
     if (isLastSubmission) {
-      try {
-        await generateReport(id, 120000)
-      } catch (err) {
-        if (err instanceof Anthropic.APIConnectionTimeoutError) {
-          console.error('Report generation timeout (submit path) for task:', id)
-        } else {
-          console.error('Report generation error:', err)
-        }
-      }
+      startReportGeneration(id)  // fire-and-forget, no await
     }
 
     const newBalance = await getBalance(user!.id)

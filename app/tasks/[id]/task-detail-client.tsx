@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
 
 interface TaskDetailProps {
   task: {
@@ -22,6 +23,7 @@ interface TaskDetailProps {
     estimatedMinutes: number
     status: string
     report: string | null
+    reportStatus: string | null
     createdAt: string
     claimedCount: number
     submittedCount: number
@@ -38,9 +40,56 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim }: Tas
   const [cancelling, setCancelling] = useState(false)
   const [generatingReport, setGeneratingReport] = useState(false)
   const [error, setError] = useState('')
+  const [reportStatus, setReportStatus] = useState(task.reportStatus)
+  const [progress, setProgress] = useState(0)
+  const startTimeRef = useRef<number | null>(null)
+  const animFrameRef = useRef<number>(0)
 
   let hostname = ''
   try { hostname = new URL(task.targetUrl).hostname } catch {}
+
+  const isGenerating = reportStatus === 'GENERATING'
+
+  // Simulated progress: 90 * (1 - e^(-t/45))
+  const updateProgress = useCallback(() => {
+    if (!startTimeRef.current) return
+    const elapsed = (Date.now() - startTimeRef.current) / 1000
+    const simulated = 90 * (1 - Math.exp(-elapsed / 45))
+    setProgress(Math.round(simulated))
+    animFrameRef.current = requestAnimationFrame(updateProgress)
+  }, [])
+
+  // Start/stop progress animation
+  useEffect(() => {
+    if (isGenerating) {
+      startTimeRef.current = Date.now()
+      animFrameRef.current = requestAnimationFrame(updateProgress)
+    } else {
+      cancelAnimationFrame(animFrameRef.current)
+      startTimeRef.current = null
+    }
+    return () => cancelAnimationFrame(animFrameRef.current)
+  }, [isGenerating, updateProgress])
+
+  // Poll report status
+  useEffect(() => {
+    if (!isGenerating) return
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/tasks/${task.id}/report-status`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.reportStatus !== 'GENERATING') {
+          setReportStatus(data.reportStatus)
+          if (data.hasReport) {
+            setProgress(100)
+            setTimeout(() => router.refresh(), 500)
+          }
+        }
+      } catch { /* ignore polling errors */ }
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [isGenerating, task.id, router])
 
   async function handleClaim() {
     setClaiming(true)
@@ -84,12 +133,17 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim }: Tas
     setError('')
     try {
       const res = await fetch(`/api/tasks/${task.id}/generate-report`, { method: 'POST' })
+      const data = await res.json()
       if (!res.ok) {
-        const data = await res.json()
-        setError(data.error || 'Failed to generate report')
+        if (res.status === 409) {
+          // Already generating — just start polling
+          setReportStatus('GENERATING')
+        } else {
+          setError(data.error || 'Failed to generate report')
+        }
         return
       }
-      router.refresh()
+      setReportStatus('GENERATING')
     } catch {
       setError('Something went wrong')
     } finally {
@@ -169,9 +223,9 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim }: Tas
 
         {isCreator && task.status !== 'CANCELLED' && (
           <>
-            {task.submittedCount >= 1 && !task.report && (
+            {task.submittedCount >= 1 && !task.report && !isGenerating && reportStatus !== 'GENERATING' && (
               <Button onClick={handleGenerateReport} disabled={generatingReport} variant="secondary">
-                {generatingReport ? 'Generating...' : 'Generate Report Now'}
+                {generatingReport ? 'Starting...' : 'Generate Report Now'}
               </Button>
             )}
             {(task.status === 'OPEN' || task.status === 'IN_PROGRESS') && (
@@ -182,6 +236,36 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim }: Tas
           </>
         )}
       </div>
+
+      {/* Report generation progress */}
+      {isGenerating && !task.report && (
+        <Card>
+          <CardContent className="pt-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Generating AI Report...</p>
+              <span className="text-sm text-muted-foreground">{progress}%</span>
+            </div>
+            <Progress value={progress} />
+            <p className="text-xs text-muted-foreground">
+              This usually takes 30-90 seconds. You can leave this page and come back.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Report generation failed */}
+      {reportStatus === 'FAILED' && !task.report && (
+        <Card className="border-red-500/50">
+          <CardContent className="pt-6 space-y-3">
+            <p className="text-sm text-red-500">Report generation failed. Please try again.</p>
+            {isCreator && (
+              <Button onClick={handleGenerateReport} disabled={generatingReport} variant="secondary" size="sm">
+                {generatingReport ? 'Starting...' : 'Retry Report Generation'}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Progress */}
       <Card>
