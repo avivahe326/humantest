@@ -28,7 +28,7 @@ interface UseMediaRecorderReturn {
   error: RecorderError
   screenRecUrl: string | null
   audioUrl: string | null
-  startRecording: () => Promise<void>
+  startRecording: () => Promise<boolean>
   stopRecording: () => void
   uploadRecordings: (taskId: string, claimId: string) => Promise<{ screenRecUrl: string; audioUrl: string }>
 }
@@ -161,7 +161,7 @@ export function useMediaRecorder({
     })
   }, [stopAllTracks])
 
-  const startRecording = useCallback(async () => {
+  const startRecording = useCallback(async (): Promise<boolean> => {
     setStatus('requesting')
     setError(null)
     setDuration(0)
@@ -178,13 +178,13 @@ export function useMediaRecorder({
       })
       screenStreamRef.current = screenStream
     } catch (err: unknown) {
-      if (!mountedRef.current) return
+      if (!mountedRef.current) return false
       const name = err instanceof DOMException ? err.name : ''
       if (name === 'NotAllowedError') setError('permission-denied')
       else if (name === 'NotFoundError') setError('no-device')
       else setError('permission-denied')
       setStatus('idle')
-      return
+      return false
     }
 
     let audioStream: MediaStream
@@ -195,19 +195,19 @@ export function useMediaRecorder({
       // Partial permission: screen granted but mic denied - cleanup screen
       screenStream.getTracks().forEach(t => t.stop())
       screenStreamRef.current = null
-      if (!mountedRef.current) return
+      if (!mountedRef.current) return false
       const name = err instanceof DOMException ? err.name : ''
       if (name === 'NotAllowedError') setError('permission-denied')
       else if (name === 'NotFoundError') setError('no-device')
       else setError('permission-denied')
       setStatus('idle')
-      return
+      return false
     }
 
     if (!mountedRef.current) {
       screenStream.getTracks().forEach(t => t.stop())
       audioStream.getTracks().forEach(t => t.stop())
-      return
+      return false
     }
 
     // Create MediaRecorders with codec detection
@@ -253,6 +253,8 @@ export function useMediaRecorder({
         stopRecording()
       }
     }, 1000)
+
+    return true
   }, [maxDurationMs, stopRecording])
 
   const uploadRecordings = useCallback(async (taskId: string, claimId: string) => {

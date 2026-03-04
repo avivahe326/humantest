@@ -105,10 +105,6 @@ export default function IntegratedTestPage() {
   useEffect(() => {
     if (recorder.status === 'recording' && phase !== 'recording') {
       setPhase('recording')
-      // Open target website after recording successfully started
-      if (task?.targetUrl) {
-        window.open(task.targetUrl, '_blank')
-      }
     }
     if (recorder.status === 'completed' && phase === 'recording' && !uploadTriggeredRef.current) {
       uploadTriggeredRef.current = true
@@ -121,8 +117,11 @@ export default function IntegratedTestPage() {
   }, [recorder.status])
 
   const handleStartRecording = useCallback(async () => {
-    await recorder.startRecording()
-  }, [recorder])
+    const started = await recorder.startRecording()
+    if (started && task?.targetUrl) {
+      window.open(task.targetUrl, '_blank')
+    }
+  }, [recorder, task])
 
   const handleStopRecording = useCallback(() => {
     recorder.stopRecording()
