@@ -167,16 +167,18 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim }: Tas
           <Badge variant="secondary" className="text-base px-4 py-2">Feedback Submitted</Badge>
         )}
 
-        {isCreator && (task.status === 'OPEN' || task.status === 'IN_PROGRESS') && (
+        {isCreator && task.status !== 'CANCELLED' && (
           <>
-            {task.submittedCount >= 1 && (
+            {task.submittedCount >= 1 && !task.report && (
               <Button onClick={handleGenerateReport} disabled={generatingReport} variant="secondary">
                 {generatingReport ? 'Generating...' : 'Generate Report Now'}
               </Button>
             )}
-            <Button onClick={handleCancel} disabled={cancelling} variant="destructive">
-              {cancelling ? 'Cancelling...' : 'Cancel Task'}
-            </Button>
+            {(task.status === 'OPEN' || task.status === 'IN_PROGRESS') && (
+              <Button onClick={handleCancel} disabled={cancelling} variant="destructive">
+                {cancelling ? 'Cancelling...' : 'Cancel Task'}
+              </Button>
+            )}
           </>
         )}
       </div>
