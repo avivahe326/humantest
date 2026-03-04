@@ -55,6 +55,17 @@ export default function IntegratedTestPage() {
 
     async function load() {
       try {
+        // Check if there was a recording session in progress (tab was discarded)
+        const wasRecording = sessionStorage.getItem(`recording-active-${taskId}`)
+        if (wasRecording) {
+          sessionStorage.removeItem(`recording-active-${taskId}`)
+          // Recording was interrupted, skip to submit page
+          if (!cancelled) {
+            router.push(`/tasks/${taskId}/submit`)
+            return
+          }
+        }
+
         const infoRes = await fetch(`/api/tasks/${taskId}/info`)
         if (!infoRes.ok) {
           if (!cancelled) {
@@ -89,7 +100,7 @@ export default function IntegratedTestPage() {
 
     load()
     return () => { cancelled = true }
-  }, [session, taskId])
+  }, [session, taskId, router])
 
   // Navigation protection during recording
   useEffect(() => {
@@ -119,9 +130,10 @@ export default function IntegratedTestPage() {
   const handleStartRecording = useCallback(async () => {
     const started = await recorder.startRecording()
     if (started && task?.targetUrl) {
+      try { sessionStorage.setItem(`recording-active-${taskId}`, '1') } catch {}
       window.open(task.targetUrl, '_blank')
     }
-  }, [recorder, task])
+  }, [recorder, task, taskId])
 
   const handleStopRecording = useCallback(() => {
     recorder.stopRecording()
@@ -140,6 +152,7 @@ export default function IntegratedTestPage() {
 
   const handleDone = useCallback(() => {
     setPhase('done')
+    try { sessionStorage.removeItem(`recording-active-${taskId}`) } catch {}
     const urls = {
       screenRecUrl: recorder.screenRecUrl,
       audioUrl: recorder.audioUrl,
@@ -159,6 +172,7 @@ export default function IntegratedTestPage() {
 
   const handleSkipUpload = useCallback(() => {
     if (window.confirm('录制将不会被保存，确定跳过？')) {
+      try { sessionStorage.removeItem(`recording-active-${taskId}`) } catch {}
       router.push(`/tasks/${taskId}/submit`)
     }
   }, [router, taskId])
