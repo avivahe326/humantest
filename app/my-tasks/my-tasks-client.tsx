@@ -26,24 +26,28 @@ interface MyTasksClientProps {
 }
 
 export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
+  const activeClaims = claims.filter(c => c.status === 'IN_PROGRESS')
+  const completedClaims = claims.filter(c => c.status === 'SUBMITTED')
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold">My Tasks</h1>
 
       <Tabs defaultValue="testing">
         <TabsList>
-          <TabsTrigger value="testing">Testing ({claims.length})</TabsTrigger>
+          <TabsTrigger value="testing">Testing ({activeClaims.length})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({completedClaims.length})</TabsTrigger>
           <TabsTrigger value="created">Created ({createdTasks.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="testing" className="mt-4 space-y-3">
-          {claims.length === 0 ? (
+          {activeClaims.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-muted-foreground">No tests claimed yet.</p>
+              <p className="text-muted-foreground">No tests in progress.</p>
               <Link href="/tasks"><Button className="mt-4">Browse available tests</Button></Link>
             </div>
           ) : (
-            claims.map(claim => (
+            activeClaims.map(claim => (
               <Card key={claim.id}>
                 <CardContent className="flex items-center justify-between py-4">
                   <div>
@@ -55,14 +59,39 @@ export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge variant={claim.status === 'SUBMITTED' ? 'secondary' : 'default'}>
-                      {claim.status}
-                    </Badge>
-                    {claim.status === 'IN_PROGRESS' && claim.task.status !== 'COMPLETED' && claim.task.status !== 'CANCELLED' && (
+                    <Badge>IN_PROGRESS</Badge>
+                    {claim.task.status !== 'COMPLETED' && claim.task.status !== 'CANCELLED' && (
                       <Link href={`/tasks/${claim.task.id}/submit`}>
                         <Button size="sm">Submit</Button>
                       </Link>
                     )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="completed" className="mt-4 space-y-3">
+          {completedClaims.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-muted-foreground">No completed tests yet.</p>
+            </div>
+          ) : (
+            completedClaims.map(claim => (
+              <Card key={claim.id}>
+                <CardContent className="flex items-center justify-between py-4">
+                  <div>
+                    <Link href={`/tasks/${claim.task.id}`} className="font-medium hover:underline">
+                      {claim.task.title}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">
+                      Claimed {new Date(claim.claimedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary">SUBMITTED</Badge>
+                    <span className="text-sm text-muted-foreground">+{claim.task.rewardPerTester} credits</span>
                   </div>
                 </CardContent>
               </Card>
