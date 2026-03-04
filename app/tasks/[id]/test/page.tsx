@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
-import { Monitor, Mic, Square, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Monitor, Mic, Square, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react'
 
 interface TestStep {
   id: string
@@ -24,8 +24,6 @@ interface TaskInfo {
 
 type Phase = 'loading' | 'error' | 'ready' | 'recording' | 'uploading' | 'done'
 
-const IFRAME_BASE_WIDTH = 1280
-
 export default function IntegratedTestPage() {
   const { data: session, status: authStatus } = useSession()
   const router = useRouter()
@@ -35,13 +33,8 @@ export default function IntegratedTestPage() {
   const [phase, setPhase] = useState<Phase>('loading')
   const [task, setTask] = useState<TaskInfo | null>(null)
   const [claimId, setClaimId] = useState<string | null>(null)
-  const [embeddable, setEmbeddable] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
-  const [useFullscreen, setUseFullscreen] = useState(false)
   const uploadTriggeredRef = useRef(false)
-  const iframeContainerRef = useRef<HTMLDivElement>(null)
-  const [iframeScale, setIframeScale] = useState(1)
-  const [containerHeight, setContainerHeight] = useState(0)
 
   const recorder = useMediaRecorder({
     maxDurationMs: 15 * 60 * 1000,
@@ -54,7 +47,7 @@ export default function IntegratedTestPage() {
     }
   }, [authStatus, router])
 
-  // Load task info + claim validation + probe
+  // Load task info + claim validation
   useEffect(() => {
     if (!session) return
 
@@ -62,7 +55,6 @@ export default function IntegratedTestPage() {
 
     async function load() {
       try {
-        // Fetch task info
         const infoRes = await fetch(`/api/tasks/${taskId}/info`)
         if (!infoRes.ok) {
           if (!cancelled) {
@@ -74,7 +66,6 @@ export default function IntegratedTestPage() {
         const taskData = await infoRes.json()
         if (!cancelled) setTask(taskData)
 
-        // Validate claim - only check existing claim, never auto-create
         const claimRes = await fetch(`/api/tasks/${taskId}/my-claim`)
         if (claimRes.ok) {
           const { claimId: existingClaimId } = await claimRes.json()
@@ -85,25 +76,6 @@ export default function IntegratedTestPage() {
             setPhase('error')
           }
           return
-        }
-
-        // Probe iframe embeddability
-        try {
-          const probeRes = await fetch(`/api/tasks/${taskId}/probe`)
-          if (probeRes.ok) {
-            const probeData = await probeRes.json()
-            // Block same-origin iframe to prevent sandbox escape (F12)
-            let canEmbed = probeData.embeddable
-            if (canEmbed) {
-              try {
-                const targetHost = new URL(taskData.targetUrl).hostname
-                if (targetHost === window.location.hostname) canEmbed = false
-              } catch { canEmbed = false }
-            }
-            if (!cancelled) setEmbeddable(canEmbed)
-          }
-        } catch {
-          // Probe failed, default to fullscreen mode
         }
 
         if (!cancelled) setPhase('ready')
@@ -129,21 +101,7 @@ export default function IntegratedTestPage() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [phase])
 
-  // iframe dynamic scaling via ResizeObserver
-  useEffect(() => {
-    if (phase !== 'recording') return
-    const el = iframeContainerRef.current
-    if (!el) return
-    const observer = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect
-      setIframeScale(Math.min(width / IFRAME_BASE_WIDTH, 1))
-      setContainerHeight(height)
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [phase])
-
-  // Watch recorder status transitions (F9: guard against double upload)
+  // Watch recorder status transitions
   useEffect(() => {
     if (recorder.status === 'recording' && phase !== 'recording') {
       setPhase('recording')
@@ -159,15 +117,12 @@ export default function IntegratedTestPage() {
   }, [recorder.status])
 
   const handleStartRecording = useCallback(async () => {
-    if (!embeddable || useFullscreen) {
-      // Fullscreen mode: open target in new tab
-      const win = window.open(task!.targetUrl, '_blank')
-      if (!win) {
-        // Popup blocked - we'll show manual link
-      }
+    const win = window.open(task!.targetUrl, '_blank')
+    if (!win) {
+      // Popup blocked - manual link available in recording UI
     }
     await recorder.startRecording()
-  }, [embeddable, useFullscreen, task, recorder])
+  }, [task, recorder])
 
   const handleStopRecording = useCallback(() => {
     recorder.stopRecording()
@@ -180,14 +135,12 @@ export default function IntegratedTestPage() {
       await recorder.uploadRecordings(taskId, claimId)
     } catch {
       // Error handled in hook - phase stays at 'uploading', recorder.error = 'upload-failed'
-      // Existing retry UI in uploading phase will be visible
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, claimId])
 
   const handleDone = useCallback(() => {
     setPhase('done')
-    // Store URLs in sessionStorage
     const urls = {
       screenRecUrl: recorder.screenRecUrl,
       audioUrl: recorder.audioUrl,
@@ -195,7 +148,6 @@ export default function IntegratedTestPage() {
     try {
       sessionStorage.setItem(`recording-urls-${taskId}`, JSON.stringify(urls))
     } catch {
-      // QuotaExceededError: fallback to query params
       const params = new URLSearchParams()
       if (urls.screenRecUrl) params.set('screenRecUrl', urls.screenRecUrl)
       if (urls.audioUrl) params.set('audioUrl', urls.audioUrl)
@@ -205,14 +157,6 @@ export default function IntegratedTestPage() {
     setTimeout(() => router.push(`/tasks/${taskId}/submit`), 1500)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, router, recorder.screenRecUrl, recorder.audioUrl])
-
-  const handleSwitchToFullscreen = useCallback(() => {
-    setUseFullscreen(true)
-    const win = window.open(task!.targetUrl, '_blank')
-    if (!win) {
-      // Will show manual link in UI
-    }
-  }, [task])
 
   const handleSkipUpload = useCallback(() => {
     if (window.confirm('录制将不会被保存，确定跳过？')) {
@@ -230,7 +174,6 @@ export default function IntegratedTestPage() {
     return <div className="py-12 text-center">Loading...</div>
   }
 
-  // Error phase
   if (phase === 'error') {
     return (
       <div className="mx-auto max-w-lg py-12 text-center space-y-4">
@@ -240,7 +183,7 @@ export default function IntegratedTestPage() {
     )
   }
 
-  // Phase: Ready (permission preparation)
+  // Phase: Ready
   if (phase === 'ready' && task) {
     return (
       <div className="mx-auto max-w-lg py-12 space-y-6">
@@ -266,6 +209,17 @@ export default function IntegratedTestPage() {
               <p className="text-xs text-muted-foreground">On macOS, you may need to grant Screen Recording and Microphone permissions in System Settings. Chrome may require a restart after granting.</p>
             </div>
 
+            <div className="rounded-lg bg-muted/50 p-4 space-y-2">
+              <p className="text-sm font-medium">How it works:</p>
+              <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                <li>Click &quot;Start Testing&quot; below</li>
+                <li>Allow screen recording when prompted</li>
+                <li>The target website will open in a new tab</li>
+                <li>Complete the test steps in the new tab</li>
+                <li>Return here to stop recording when done</li>
+              </ol>
+            </div>
+
             {recorder.error === 'permission-denied' && (
               <p className="text-sm text-red-500">Permission denied. Please allow screen recording and microphone access, or skip recording.</p>
             )}
@@ -289,97 +243,69 @@ export default function IntegratedTestPage() {
 
   // Phase: Recording
   if (phase === 'recording' && task) {
-    const isFullscreen = !embeddable || useFullscreen
-
     return (
-      <div className="flex h-[calc(100vh-4rem)]">
-        {/* Left: iframe or fullscreen prompt */}
-        <div ref={iframeContainerRef} className="flex-1 relative overflow-hidden bg-muted/30">
-          {!isFullscreen ? (
-            <>
-              <iframe
-                src={task.targetUrl}
-                className="absolute top-0 border-0"
-                style={{
-                  width: `${IFRAME_BASE_WIDTH}px`,
-                  height: containerHeight > 0 ? `${Math.round(containerHeight / iframeScale)}px` : '100%',
-                  transform: `scale(${iframeScale})`,
-                  transformOrigin: '0 0',
-                  left: iframeScale < 1 ? 0 : '50%',
-                  marginLeft: iframeScale < 1 ? 0 : `-${IFRAME_BASE_WIDTH / 2}px`,
-                }}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              />
-              <button
-                onClick={handleSwitchToFullscreen}
-                className="absolute bottom-3 left-3 text-xs text-muted-foreground underline hover:text-primary bg-background/80 px-2 py-1 rounded"
-              >
-                Can&apos;t load iframe? Switch to fullscreen mode
-              </button>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full space-y-4 p-8">
-              <Monitor className="h-16 w-16 text-muted-foreground" />
-              <p className="text-lg font-medium">Target website opened in a new tab</p>
-              <p className="text-sm text-muted-foreground">Please interact with the target website in the new tab. Your screen is being recorded.</p>
+      <div className="mx-auto max-w-lg py-12 space-y-6">
+        <Card>
+          <CardContent className="pt-6 space-y-6">
+            {/* Recording indicator */}
+            <div className="flex items-center justify-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+              </span>
+              <span className="font-mono text-2xl font-bold">{mm}:{ss}</span>
+              <Badge variant="destructive" className="text-xs">REC</Badge>
+            </div>
+
+            {/* Time warning */}
+            {remainingMin < 2 && (
+              <div className="flex items-center justify-center gap-2 text-yellow-500 text-sm">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Less than {remainingMin > 0 ? `${remainingMin} min` : '1 min'} remaining. Recording will stop automatically.</span>
+              </div>
+            )}
+
+            {/* Target website link */}
+            <div className="rounded-lg border p-4 text-center space-y-3">
+              <Monitor className="h-10 w-10 text-muted-foreground mx-auto" />
+              <p className="text-sm text-muted-foreground">Target website is open in a new tab. Complete the test steps there.</p>
               <a
                 href={task.targetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-primary underline"
+                className="inline-flex items-center gap-1 text-sm text-primary underline"
               >
-                Open target website manually
+                <ExternalLink className="h-3 w-3" />
+                Open target website
               </a>
             </div>
-          )}
-        </div>
 
-        {/* Right: sidebar */}
-        <div className="w-80 border-l flex flex-col p-4 space-y-4 overflow-y-auto">
-          {/* Recording indicator */}
-          <div className="flex items-center gap-3">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-            </span>
-            <span className="font-mono text-lg font-bold">{mm}:{ss}</span>
-            <Badge variant="destructive" className="text-xs">REC</Badge>
-          </div>
+            {/* Test steps */}
+            {task.requirements?.steps && task.requirements.steps.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Test Steps</p>
+                <div className="space-y-1">
+                  {task.requirements.steps.map((s: TestStep, i: number) => (
+                    <div key={s.id} className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">{i + 1}.</span> {s.instruction}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-          {/* Time warning */}
-          {remainingMin < 2 && (
-            <div className="flex items-center gap-2 text-yellow-500 text-sm">
-              <AlertTriangle className="h-4 w-4" />
-              <span>Less than {remainingMin > 0 ? `${remainingMin} min` : '1 min'} remaining. Recording will stop automatically.</span>
-            </div>
-          )}
-
-          {/* Test steps */}
-          {task.requirements?.steps && task.requirements.steps.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Test Steps</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {task.requirements.steps.map((s: TestStep, i: number) => (
-                  <div key={s.id} className="text-sm">
-                    <span className="font-medium">{i + 1}.</span> {s.instruction}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Stop button */}
-          <Button
-            variant="destructive"
-            onClick={handleStopRecording}
-            className="w-full mt-auto"
-          >
-            <Square className="h-4 w-4 mr-2" />
-            Stop Recording
-          </Button>
-        </div>
+            {/* Stop button */}
+            <Button
+              variant="destructive"
+              onClick={handleStopRecording}
+              className="w-full"
+              size="lg"
+            >
+              <Square className="h-4 w-4 mr-2" />
+              Stop Recording
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
