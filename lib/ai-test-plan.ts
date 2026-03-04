@@ -27,7 +27,7 @@ export async function generateTestPlan(
 
   const response = await anthropic.messages.create(
     {
-      model: 'claude-sonnet-4-6-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: 'You are a UX research expert. Generate structured usability test plans. Always respond with valid JSON only, no markdown wrapping.',
       messages: [

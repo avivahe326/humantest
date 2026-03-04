@@ -56,7 +56,7 @@ ${fb.audioUrl ? `**Audio:** ${fb.audioUrl}` : ''}`
 
   const response = await anthropic.messages.create(
     {
-      model: 'claude-sonnet-4-6-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       system: 'You are a UX research analyst. Generate a comprehensive usability test report from tester feedback. Use markdown formatting. Cite specific testers by name when referencing their feedback.',
       messages: [
