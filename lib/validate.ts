@@ -6,6 +6,19 @@ export const registerSchema = z.object({
   password: z.string().min(6).max(100),
 })
 
+export const sendCodeSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.email(),
+  password: z.string().min(6).max(100),
+})
+
+export const registerWithCodeSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.email(),
+  password: z.string().min(6).max(100),
+  code: z.string().regex(/^\d{6}$/, 'Verification code must be 6 digits'),
+})
+
 export const createTaskSchema = z.object({
   url: z.url(),
   title: z.string().max(200).optional(),

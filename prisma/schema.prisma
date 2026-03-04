@@ -100,3 +100,14 @@ enum ClaimStatus {
   SUBMITTED
   ABANDONED
 }
+
+model EmailVerificationCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String   @db.VarChar(6)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, code])
+  @@index([expiresAt])
+}
