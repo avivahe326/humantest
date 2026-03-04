@@ -63,18 +63,20 @@ model TaskClaim {
 }
 
 model Feedback {
-  id           String   @id @default(cuid())
-  taskId       String
-  claimId      String   @unique
-  userId       String
-  textFeedback String?  @db.Text
-  screenRecUrl String?  @db.VarChar(2000)
-  audioUrl     String?  @db.VarChar(2000)
-  rawData      Json?
-  createdAt    DateTime @default(now())
-  task         Task     @relation(fields: [taskId], references: [id])
-  claim        TaskClaim @relation(fields: [claimId], references: [id])
-  user         User     @relation(fields: [userId], references: [id])
+  id                  String   @id @default(cuid())
+  taskId              String
+  claimId             String   @unique
+  userId              String
+  textFeedback        String?  @db.Text
+  screenRecUrl        String?  @db.VarChar(2000)
+  audioUrl            String?  @db.VarChar(2000)
+  rawData             Json?
+  mediaAnalysis       String?  @db.LongText
+  mediaAnalysisStatus String?  @db.VarChar(20)
+  createdAt           DateTime @default(now())
+  task                Task     @relation(fields: [taskId], references: [id])
+  claim               TaskClaim @relation(fields: [claimId], references: [id])
+  user                User     @relation(fields: [userId], references: [id])
 }
 
 model CreditTransaction {

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
 import { sendWebhook } from '@/lib/webhook'
+import { analyzeMediaForFeedback, generateAggregateReport } from '@/lib/gemini'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -15,7 +16,10 @@ interface RawData {
   worst: string
 }
 
-export async function generateReport(taskId: string, timeoutMs: number = 1800000): Promise<string> {
+/**
+ * Text-only report generation via Claude (fallback when no media exists).
+ */
+export async function generateTextOnlyReport(taskId: string, timeoutMs: number = 1800000): Promise<string> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: {
@@ -88,23 +92,111 @@ Please generate a structured report with these sections:
   )
 
   const content = response.content[0]
-  const report = (content && content.type === 'text') ? content.text : 'Report generation failed.'
+  return (content && content.type === 'text') ? content.text : 'Report generation failed.'
+}
 
-  // Conditional update: only write if no report exists yet (prevents concurrent overwrites)
+/**
+ * Full report generation with Gemini media analysis.
+ * Phase 1: Parallel per-tester video/audio analysis
+ * Phase 2: Aggregate report from all analyses
+ */
+export async function generateReport(taskId: string): Promise<string> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: {
+      feedbacks: {
+        include: {
+          user: { select: { name: true } },
+        },
+      },
+    },
+  })
+
+  if (!task) throw new Error('Task not found')
+  if (task.feedbacks.length === 0) throw new Error('No feedback to generate report from')
+
+  const hasAnyMedia = task.feedbacks.some(fb => fb.screenRecUrl || fb.audioUrl)
+
+  // If no media at all, fall back to text-only report
+  if (!hasAnyMedia) {
+    const report = await generateTextOnlyReport(taskId)
+    await prisma.task.updateMany({
+      where: { id: taskId, report: null },
+      data: { report, reportStatus: 'COMPLETED' },
+    })
+    if (task.webhookUrl) {
+      try { await sendWebhook(taskId) } catch (err) { console.error('Webhook error:', err) }
+    }
+    return report
+  }
+
+  // Phase 1: Parallel per-tester media analysis
+  console.log(`[Report ${taskId}] Phase 1: Analyzing media for ${task.feedbacks.length} testers`)
+
+  // Mark all feedbacks with media as GENERATING
+  const feedbacksWithMedia = task.feedbacks.filter(fb => fb.screenRecUrl || fb.audioUrl)
+  await prisma.feedback.updateMany({
+    where: { id: { in: feedbacksWithMedia.map(fb => fb.id) } },
+    data: { mediaAnalysisStatus: 'GENERATING' },
+  })
+
+  const analysisResults = await Promise.allSettled(
+    feedbacksWithMedia.map(async (feedback) => {
+      try {
+        const analysis = await analyzeMediaForFeedback(feedback, task)
+        await prisma.feedback.update({
+          where: { id: feedback.id },
+          data: { mediaAnalysis: analysis, mediaAnalysisStatus: 'COMPLETED' },
+        })
+        return { feedbackId: feedback.id, analysis }
+      } catch (err) {
+        console.error(`[Report ${taskId}] Media analysis failed for feedback ${feedback.id}:`, err)
+        await prisma.feedback.update({
+          where: { id: feedback.id },
+          data: { mediaAnalysisStatus: 'FAILED' },
+        })
+        throw err
+      }
+    })
+  )
+
+  // Collect completed analyses
+  const completedCount = analysisResults.filter(r => r.status === 'fulfilled').length
+  console.log(`[Report ${taskId}] Phase 1 complete: ${completedCount}/${feedbacksWithMedia.length} analyses succeeded`)
+
+  // Re-fetch feedbacks to get updated mediaAnalysis
+  const updatedFeedbacks = await prisma.feedback.findMany({
+    where: { taskId },
+    include: { user: { select: { name: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  // Phase 2: Aggregate report
+  console.log(`[Report ${taskId}] Phase 2: Generating aggregate report`)
+
+  const feedbackAnalyses = updatedFeedbacks.map(fb => {
+    const raw = fb.rawData as RawData | null
+    return {
+      testerName: fb.user.name || 'Anonymous',
+      mediaAnalysis: fb.mediaAnalysis,
+      textFeedback: fb.textFeedback,
+      rawData: fb.rawData,
+      nps: raw?.nps ?? null,
+    }
+  })
+
+  const report = await generateAggregateReport(task, feedbackAnalyses)
+
   await prisma.task.updateMany({
     where: { id: taskId, report: null },
     data: { report, reportStatus: 'COMPLETED' },
   })
 
-  // Fire webhook if configured
   if (task.webhookUrl) {
-    try {
-      await sendWebhook(taskId)
-    } catch (err) {
-      console.error('Webhook error:', err)
-    }
+    try { await sendWebhook(taskId) } catch (err) { console.error('Webhook error:', err) }
   }
 
+  console.log(`[Report ${taskId}] Report generation complete`)
   return report
 }
 

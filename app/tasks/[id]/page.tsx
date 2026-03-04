@@ -30,6 +30,25 @@ export default async function TaskDetailPage({
   const isCreator = session?.user?.id === task.creatorId
   const spotsRemaining = task.maxTesters - task._count.claims
 
+  // Fetch feedbacks with media analysis for creators
+  const feedbacks = isCreator ? await prisma.feedback.findMany({
+    where: { taskId: id },
+    include: { user: { select: { name: true } } },
+    orderBy: { createdAt: 'asc' },
+  }) : []
+
+  const serializedFeedbacks = feedbacks.map(fb => ({
+    id: fb.id,
+    testerName: fb.user.name || 'Anonymous',
+    createdAt: fb.createdAt.toISOString(),
+    screenRecUrl: fb.screenRecUrl,
+    audioUrl: fb.audioUrl,
+    rawData: fb.rawData as Record<string, unknown> | null,
+    textFeedback: fb.textFeedback,
+    mediaAnalysis: fb.mediaAnalysis,
+    mediaAnalysisStatus: fb.mediaAnalysisStatus,
+  }))
+
   return (
     <TaskDetailClient
       task={{
@@ -53,6 +72,7 @@ export default async function TaskDetailPage({
       isLoggedIn={!!session}
       isCreator={isCreator}
       userClaim={userClaim ? { id: userClaim.id, status: userClaim.status } : null}
+      feedbacks={serializedFeedbacks}
     />
   )
 }
