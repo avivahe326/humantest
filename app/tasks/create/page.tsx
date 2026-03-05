@@ -27,11 +27,11 @@ export default function CreateTaskPage() {
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [focus, setFocus] = useState('')
-  const [estimatedMinutes, setEstimatedMinutes] = useState(10)
-  const [rewardPerTester, setRewardPerTester] = useState(20)
-  const [maxTesters, setMaxTesters] = useState(5)
+  const [estimatedMinutes, setEstimatedMinutes] = useState<number | ''>(10)
+  const [rewardPerTester, setRewardPerTester] = useState<number | ''>(20)
+  const [maxTesters, setMaxTesters] = useState<number | ''>(5)
 
-  const totalCost = rewardPerTester * maxTesters
+  const totalCost = (rewardPerTester || 0) * (maxTesters || 0)
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -56,7 +56,7 @@ export default function CreateTaskPage() {
       const res = await fetch('/api/ai/generate-test-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, focus, estimatedMinutes }),
+        body: JSON.stringify({ url, focus, estimatedMinutes: estimatedMinutes || 10 }),
       })
       if (!res.ok) throw new Error('Failed to generate plan')
       const plan = await res.json()
@@ -85,10 +85,10 @@ export default function CreateTaskPage() {
           url,
           title: title || undefined,
           focus: focus || undefined,
-          estimatedMinutes,
-          rewardPerTester,
-          maxTesters,
-          requirements: steps.length > 0 ? { steps, nps: true, estimatedMinutes } : undefined,
+          estimatedMinutes: estimatedMinutes || 10,
+          rewardPerTester: rewardPerTester || 20,
+          maxTesters: maxTesters || 5,
+          requirements: steps.length > 0 ? { steps, nps: true, estimatedMinutes: estimatedMinutes || 10 } : undefined,
         }),
       })
 
@@ -153,7 +153,7 @@ export default function CreateTaskPage() {
               min={1}
               max={120}
               value={estimatedMinutes}
-              onChange={e => setEstimatedMinutes(Number(e.target.value))}
+              onChange={e => setEstimatedMinutes(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </div>
           <div className="space-y-2">
@@ -164,7 +164,7 @@ export default function CreateTaskPage() {
               min={1}
               max={1000}
               value={rewardPerTester}
-              onChange={e => setRewardPerTester(Number(e.target.value))}
+              onChange={e => setRewardPerTester(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </div>
           <div className="space-y-2">
@@ -175,7 +175,7 @@ export default function CreateTaskPage() {
               min={1}
               max={50}
               value={maxTesters}
-              onChange={e => setMaxTesters(Number(e.target.value))}
+              onChange={e => setMaxTesters(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </div>
         </div>
