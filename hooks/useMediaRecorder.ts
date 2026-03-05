@@ -31,6 +31,7 @@ interface UseMediaRecorderReturn {
   startRecording: () => Promise<boolean>
   stopRecording: () => void
   uploadRecordings: (taskId: string, claimId: string) => Promise<{ screenRecUrl: string; audioUrl: string }>
+  recoverAndUpload: (taskId: string, claimId: string) => Promise<boolean>
 }
 
 function getSupportedVideoMimeType(): string {
@@ -78,6 +79,82 @@ function xhrUpload(
   })
 }
 
+// IndexedDB helpers for persisting recording chunks
+const DB_NAME = 'recording-chunks'
+const DB_VERSION = 1
+
+function openChunkDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains('screen')) db.createObjectStore('screen', { autoIncrement: true })
+      if (!db.objectStoreNames.contains('audio')) db.createObjectStore('audio', { autoIncrement: true })
+      if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta')
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function saveChunk(storeName: 'screen' | 'audio', chunk: Blob): Promise<void> {
+  const db = await openChunkDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite')
+    tx.objectStore(storeName).add(chunk)
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+  })
+}
+
+async function saveMeta(taskId: string): Promise<void> {
+  const db = await openChunkDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('meta', 'readwrite')
+    tx.objectStore('meta').put(taskId, 'taskId')
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+  })
+}
+
+async function loadChunks(storeName: 'screen' | 'audio'): Promise<Blob[]> {
+  const db = await openChunkDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly')
+    const req = tx.objectStore(storeName).getAll()
+    req.onsuccess = () => { db.close(); resolve(req.result as Blob[]) }
+    req.onerror = () => { db.close(); reject(req.error) }
+  })
+}
+
+async function loadMeta(): Promise<string | null> {
+  try {
+    const db = await openChunkDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('meta', 'readonly')
+      const req = tx.objectStore('meta').get('taskId')
+      req.onsuccess = () => { db.close(); resolve(req.result as string | null) }
+      req.onerror = () => { db.close(); reject(req.error) }
+    })
+  } catch {
+    return null
+  }
+}
+
+async function clearChunkDB(): Promise<void> {
+  try {
+    const db = await openChunkDB()
+    const tx = db.transaction(['screen', 'audio', 'meta'], 'readwrite')
+    tx.objectStore('screen').clear()
+    tx.objectStore('audio').clear()
+    tx.objectStore('meta').clear()
+    return new Promise((resolve) => {
+      tx.oncomplete = () => { db.close(); resolve() }
+      tx.onerror = () => { db.close(); resolve() }
+    })
+  } catch {}
+}
+
 export function useMediaRecorder({
   maxDurationMs = 15 * 60 * 1000,
 }: UseMediaRecorderOptions): UseMediaRecorderReturn {
@@ -106,14 +183,11 @@ export function useMediaRecorder({
     mountedRef.current = true
     return () => {
       mountedRef.current = false
-      // Stop all tracks
       screenStreamRef.current?.getTracks().forEach(t => t.stop())
       audioStreamRef.current?.getTracks().forEach(t => t.stop())
       if (timerRef.current) clearInterval(timerRef.current)
-      // Stop recorders if active
       try { screenRecorderRef.current?.stop() } catch {}
       try { audioRecorderRef.current?.stop() } catch {}
-      // Release web lock
       if (lockReleaseRef.current) {
         lockReleaseRef.current()
         lockReleaseRef.current = null
@@ -144,7 +218,7 @@ export function useMediaRecorder({
       if (!sr || sr.state !== 'recording') { resolve(); return }
       sr.onstop = () => {
         screenBlobRef.current = new Blob(screenChunksRef.current, { type: 'video/webm' })
-        screenChunksRef.current = [] // Free memory (F10)
+        screenChunksRef.current = []
         resolve()
       }
       sr.stop()
@@ -155,7 +229,7 @@ export function useMediaRecorder({
       if (!ar || ar.state !== 'recording') { resolve(); return }
       ar.onstop = () => {
         audioBlobRef.current = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        audioChunksRef.current = [] // Free memory (F10)
+        audioChunksRef.current = []
         resolve()
       }
       ar.stop()
@@ -163,7 +237,6 @@ export function useMediaRecorder({
 
     Promise.all([screenDone, audioDone]).then(() => {
       stopAllTracks()
-      // Release the web lock so browser can manage tab normally again
       if (lockReleaseRef.current) {
         lockReleaseRef.current()
         lockReleaseRef.current = null
@@ -180,6 +253,9 @@ export function useMediaRecorder({
     audioChunksRef.current = []
     screenBlobRef.current = null
     audioBlobRef.current = null
+
+    // Clear any previous IndexedDB chunks
+    await clearChunkDB()
 
     let screenStream: MediaStream
     try {
@@ -203,7 +279,6 @@ export function useMediaRecorder({
       audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
       audioStreamRef.current = audioStream
     } catch (err: unknown) {
-      // Partial permission: screen granted but mic denied - cleanup screen
       screenStream.getTracks().forEach(t => t.stop())
       screenStreamRef.current = null
       if (!mountedRef.current) return false
@@ -221,7 +296,6 @@ export function useMediaRecorder({
       return false
     }
 
-    // Create MediaRecorders with codec detection
     const videoMime = getSupportedVideoMimeType()
     const audioMime = getSupportedAudioMimeType()
 
@@ -236,12 +310,18 @@ export function useMediaRecorder({
     screenRecorderRef.current = screenRecorder
     audioRecorderRef.current = audioRecorder
 
-    // Collect chunks (filter empty)
+    // Collect chunks and persist to IndexedDB
     screenRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) screenChunksRef.current.push(e.data)
+      if (e.data.size > 0) {
+        screenChunksRef.current.push(e.data)
+        saveChunk('screen', e.data).catch(() => {})
+      }
     }
     audioRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      if (e.data.size > 0) {
+        audioChunksRef.current.push(e.data)
+        saveChunk('audio', e.data).catch(() => {})
+      }
     }
 
     // Track ended (user stopped sharing via browser UI)
@@ -256,7 +336,6 @@ export function useMediaRecorder({
     setStatus('recording')
 
     // Prevent browser from discarding this tab during recording
-    // Web Locks API keeps the tab alive while the lock is held
     if (navigator.locks) {
       navigator.locks.request('recording-active', { mode: 'exclusive' }, () => {
         return new Promise<void>((resolve) => {
@@ -304,7 +383,6 @@ export function useMediaRecorder({
       }
     }
 
-    // Upload screen if not already done
     if (!screenUrl) {
       try {
         const res = await fetch('/api/oss/presign', {
@@ -333,7 +411,6 @@ export function useMediaRecorder({
       updateTotalProgress()
     }
 
-    // Upload audio if not already done
     if (!audioUrlResult) {
       try {
         const res = await fetch('/api/oss/presign', {
@@ -375,8 +452,86 @@ export function useMediaRecorder({
       console.warn('Failed to persist recording URLs to claim:', e)
     }
 
+    // Clear IndexedDB chunks after successful upload
+    await clearChunkDB()
+
     return { screenRecUrl: screenUrl!, audioUrl: audioUrlResult! }
   }, [screenRecUrl, audioUrl])
+
+  // Recover chunks from IndexedDB and upload (called after tab discard recovery)
+  const recoverAndUpload = useCallback(async (taskId: string, claimId: string): Promise<boolean> => {
+    try {
+      const screenChunks = await loadChunks('screen')
+      const audioChunks = await loadChunks('audio')
+
+      if (screenChunks.length === 0 && audioChunks.length === 0) {
+        return false
+      }
+
+      setStatus('uploading')
+      setUploadProgress(0)
+
+      const screenBlob = screenChunks.length > 0 ? new Blob(screenChunks, { type: 'video/webm' }) : null
+      const audioBlob = audioChunks.length > 0 ? new Blob(audioChunks, { type: 'audio/webm' }) : null
+
+      const totalSize = (screenBlob?.size || 0) + (audioBlob?.size || 0)
+      let uploaded = 0
+
+      let screenUrl: string | null = null
+      let audioUrlResult: string | null = null
+
+      if (screenBlob) {
+        const res = await fetch('/api/oss/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, claimId, type: 'screen' }),
+        })
+        if (!res.ok) throw new Error('Failed to get presign URL')
+        const { uploadUrl, objectUrl } = await res.json()
+        await xhrUpload(uploadUrl, screenBlob, 'video/webm', (loaded) => {
+          if (mountedRef.current) setUploadProgress(Math.round(((uploaded + loaded) / totalSize) * 100))
+        })
+        screenUrl = objectUrl
+        uploaded += screenBlob.size
+        if (mountedRef.current) setScreenRecUrl(objectUrl)
+      }
+
+      if (audioBlob) {
+        const res = await fetch('/api/oss/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, claimId, type: 'audio' }),
+        })
+        if (!res.ok) throw new Error('Failed to get presign URL')
+        const { uploadUrl, objectUrl } = await res.json()
+        await xhrUpload(uploadUrl, audioBlob, 'audio/webm', (loaded) => {
+          if (mountedRef.current) setUploadProgress(Math.round(((uploaded + loaded) / totalSize) * 100))
+        })
+        audioUrlResult = objectUrl
+        if (mountedRef.current) setAudioUrl(objectUrl)
+      }
+
+      // Save URLs to claim
+      try {
+        await fetch(`/api/tasks/${taskId}/my-claim`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ screenRecUrl: screenUrl, audioUrl: audioUrlResult }),
+        })
+      } catch {}
+
+      await clearChunkDB()
+      if (mountedRef.current) setStatus('done')
+      return true
+    } catch (e) {
+      console.error('Recovery upload failed:', e)
+      if (mountedRef.current) {
+        setError('upload-failed')
+        setStatus('idle')
+      }
+      return false
+    }
+  }, [])
 
   return {
     status,
@@ -388,5 +543,6 @@ export function useMediaRecorder({
     startRecording,
     stopRecording,
     uploadRecordings,
+    recoverAndUpload,
   }
 }

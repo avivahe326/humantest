@@ -65,15 +65,21 @@ export default function IntegratedTestPage() {
             if (claimRes.ok) {
               const claimData = await claimRes.json()
               if (claimData.screenRecUrl || claimData.audioUrl) {
-                // Upload was completed before tab was discarded — go straight to submit
-                if (!cancelled) {
-                  router.push(`/tasks/${taskId}/submit`)
-                }
+                if (!cancelled) router.push(`/tasks/${taskId}/submit`)
                 return
+              }
+              // Try to recover chunks from IndexedDB and upload
+              if (!cancelled) {
+                setPhase('uploading')
+                const recovered = await recorder.recoverAndUpload(taskId, claimData.claimId)
+                if (recovered) {
+                  if (!cancelled) router.push(`/tasks/${taskId}/submit`)
+                  return
+                }
               }
             }
           } catch {}
-          // No URLs in DB — recording was truly lost
+          // No URLs and no recoverable chunks
           if (!cancelled) {
             setPhase('interrupted')
           }
