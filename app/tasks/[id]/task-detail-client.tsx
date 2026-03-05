@@ -63,6 +63,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const [generatingReport, setGeneratingReport] = useState(false)
   const [error, setError] = useState('')
   const [reportStatus, setReportStatus] = useState(task.reportStatus)
+  const [report, setReport] = useState(task.report)
   const [progress, setProgress] = useState(0)
   const [feedbackStatuses, setFeedbackStatuses] = useState<FeedbackStatusInfo[]>([])
   const [expandedFeedbacks, setExpandedFeedbacks] = useState<Set<string>>(new Set())
@@ -169,6 +170,10 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   async function handleGenerateReport(regenerate = false) {
     setGeneratingReport(true)
     setError('')
+    if (regenerate) {
+      setReport(null)
+      setProgress(0)
+    }
     try {
       const url = regenerate
         ? `/api/tasks/${task.id}/generate-report?regenerate=1`
@@ -197,7 +202,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const analysisTotal = feedbackStatuses.length
   const allAnalysesDone = analysisTotal > 0 && analysisCompleted === analysisTotal
 
-  const showTabs = task.report || isGenerating || reportStatus === 'FAILED' || (isCreator && initialFeedbacks.length > 0)
+  const showTabs = report || isGenerating || reportStatus === 'FAILED' || (isCreator && initialFeedbacks.length > 0)
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -271,7 +276,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
         {isCreator && task.status !== 'CANCELLED' && (
           <>
-            {task.submittedCount >= 1 && !task.report && !isGenerating && reportStatus !== 'GENERATING' && (
+            {task.submittedCount >= 1 && !report && !isGenerating && reportStatus !== 'GENERATING' && (
               <Button onClick={() => handleGenerateReport()} disabled={generatingReport} variant="secondary">
                 {generatingReport ? 'Starting...' : 'Generate Report Now'}
               </Button>
@@ -319,7 +324,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
           <TabsContent value="report" className="space-y-4 mt-4">
             {/* Report generation progress */}
-            {isGenerating && !task.report && (
+            {isGenerating && !report && (
               <Card>
                 <CardContent className="pt-6 space-y-3">
                   <div className="flex items-center justify-between">
@@ -366,7 +371,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
             )}
 
             {/* Report generation failed */}
-            {reportStatus === 'FAILED' && !task.report && (
+            {reportStatus === 'FAILED' && !report && (
               <Card className="border-red-500/50">
                 <CardContent className="pt-6 space-y-3">
                   <p className="text-sm text-red-500">Report generation failed. Please try again.</p>
@@ -380,7 +385,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
             )}
 
             {/* Report display */}
-            {task.report && (
+            {report && (
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -399,13 +404,13 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                 </CardHeader>
                 <CardContent className="prose prose-invert max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {task.report}
+                    {report}
                   </ReactMarkdown>
                 </CardContent>
               </Card>
             )}
 
-            {!task.report && !isGenerating && reportStatus !== 'FAILED' && (
+            {!report && !isGenerating && reportStatus !== 'FAILED' && (
               <p className="text-sm text-muted-foreground text-center py-8">No report generated yet.</p>
             )}
           </TabsContent>
