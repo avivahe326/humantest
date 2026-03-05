@@ -57,22 +57,28 @@ export default function SubmitFeedbackPage() {
     const recordingKey = `recording-urls-${taskId}`
     let fromRecording = false
 
-    const tryLoadRecordingUrls = (storage: Storage) => {
+    const tryLoadRecordingUrls = (storage: Storage, storageName: string) => {
       const data = storage.getItem(recordingKey)
+      console.log(`[Submit] Checking ${storageName} for recording URLs:`, data)
       if (!data) return false
       try {
         const { screenRecUrl: sUrl, audioUrl: aUrl } = JSON.parse(data)
+        console.log(`[Submit] Parsed URLs from ${storageName}:`, { sUrl, aUrl })
         let found = false
         if (sUrl) { setScreenRecUrl(sUrl); found = true }
         if (aUrl) { setAudioUrl(aUrl); found = true }
         if (found) setAutoRecorded(true)
         return found
-      } catch { return false }
+      } catch (e) {
+        console.error(`[Submit] Failed to parse ${storageName} data:`, e)
+        return false
+      }
     }
 
     // Try sessionStorage first, then localStorage
-    fromRecording = tryLoadRecordingUrls(sessionStorage) || tryLoadRecordingUrls(localStorage)
+    fromRecording = tryLoadRecordingUrls(sessionStorage, 'sessionStorage') || tryLoadRecordingUrls(localStorage, 'localStorage')
     if (fromRecording) {
+      console.log('[Submit] Loaded recording URLs, cleaning up storage')
       try { sessionStorage.removeItem(recordingKey) } catch {}
       try { localStorage.removeItem(recordingKey) } catch {}
       return
@@ -82,6 +88,7 @@ export default function SubmitFeedbackPage() {
     const urlParams = new URLSearchParams(window.location.search)
     const qScreen = urlParams.get('screenRecUrl')
     const qAudio = urlParams.get('audioUrl')
+    console.log('[Submit] Checking URL params:', { qScreen, qAudio })
     if (qScreen || qAudio) {
       if (qScreen) setScreenRecUrl(qScreen)
       if (qAudio) setAudioUrl(qAudio)
@@ -95,6 +102,7 @@ export default function SubmitFeedbackPage() {
       const draft = localStorage.getItem(storageKey)
       if (draft) {
         const parsed = JSON.parse(draft)
+        console.log('[Submit] Restored draft from localStorage:', parsed)
         if (parsed.firstImpression) setFirstImpression(parsed.firstImpression)
         if (parsed.stepAnswers) setStepAnswers(parsed.stepAnswers)
         if (parsed.nps) setNps(parsed.nps)

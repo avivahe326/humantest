@@ -157,13 +157,19 @@ export default function IntegratedTestPage() {
       screenRecUrl: recorder.screenRecUrl,
       audioUrl: recorder.audioUrl,
     }
+    console.log('[Recording] Saving URLs:', urls)
     // Save to both sessionStorage and localStorage for reliability
     try {
       sessionStorage.setItem(`recording-urls-${taskId}`, JSON.stringify(urls))
-    } catch {}
+      console.log('[Recording] Saved to sessionStorage')
+    } catch (e) {
+      console.error('[Recording] Failed to save to sessionStorage:', e)
+    }
     try {
       localStorage.setItem(`recording-urls-${taskId}`, JSON.stringify(urls))
-    } catch {
+      console.log('[Recording] Saved to localStorage')
+    } catch (e) {
+      console.error('[Recording] Failed to save to localStorage:', e)
       const params = new URLSearchParams()
       if (urls.screenRecUrl) params.set('screenRecUrl', urls.screenRecUrl)
       if (urls.audioUrl) params.set('audioUrl', urls.audioUrl)
