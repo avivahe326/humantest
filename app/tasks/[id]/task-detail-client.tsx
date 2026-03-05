@@ -214,9 +214,9 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
         if (data.reportStatus !== 'GENERATING') {
           setReportStatus(data.reportStatus)
-          if (data.hasReport) {
+          if (data.hasReport && data.report) {
             setProgress(100)
-            setTimeout(() => router.refresh(), 500)
+            setReport(data.report)
           }
         }
       } catch { /* ignore */ }

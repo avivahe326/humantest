@@ -28,6 +28,11 @@ export async function GET(
     updatedAt: task.updatedAt.toISOString(),
   }
 
+  // Include report content when completed so frontend can display immediately
+  if (task.report !== null) {
+    response.report = task.report
+  }
+
   // Include per-feedback analysis status for the task creator
   if (isCreator) {
     const feedbacks = await prisma.feedback.findMany({
