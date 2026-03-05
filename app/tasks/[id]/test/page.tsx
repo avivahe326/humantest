@@ -22,7 +22,7 @@ interface TaskInfo {
   requirements: { steps: TestStep[] } | null
 }
 
-type Phase = 'loading' | 'error' | 'ready' | 'recording' | 'uploading' | 'done'
+type Phase = 'loading' | 'error' | 'ready' | 'recording' | 'uploading' | 'done' | 'interrupted'
 
 export default function IntegratedTestPage() {
   const { data: session, status: authStatus } = useSession()
@@ -59,11 +59,11 @@ export default function IntegratedTestPage() {
         const wasRecording = sessionStorage.getItem(`recording-active-${taskId}`)
         if (wasRecording) {
           sessionStorage.removeItem(`recording-active-${taskId}`)
-          // Recording was interrupted, skip to submit page
+          // Recording was interrupted — show recovery UI instead of auto-redirecting
           if (!cancelled) {
-            router.push(`/tasks/${taskId}/submit`)
-            return
+            setPhase('interrupted')
           }
+          return
         }
 
         const infoRes = await fetch(`/api/tasks/${taskId}/info`)
@@ -369,6 +369,28 @@ export default function IntegratedTestPage() {
         <Button variant="link" onClick={() => router.push(`/tasks/${taskId}/submit`)}>
           如果没有自动跳转，点击这里
         </Button>
+      </div>
+    )
+  }
+
+  // Phase: Interrupted (tab was discarded during recording)
+  if (phase === 'interrupted') {
+    return (
+      <div className="mx-auto max-w-md py-12 space-y-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto" />
+        <h2 className="text-lg font-bold">Recording interrupted</h2>
+        <p className="text-sm text-muted-foreground">
+          Your browser tab was unloaded during recording, so the video/audio data was lost.
+          You can re-record or continue to submit feedback without a recording.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Button onClick={() => setPhase('ready')}>
+            Re-record
+          </Button>
+          <Button variant="outline" onClick={() => router.push(`/tasks/${taskId}/submit`)}>
+            Submit without recording
+          </Button>
+        </div>
       </div>
     )
   }
