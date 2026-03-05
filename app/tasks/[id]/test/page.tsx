@@ -59,7 +59,21 @@ export default function IntegratedTestPage() {
         const wasRecording = sessionStorage.getItem(`recording-active-${taskId}`)
         if (wasRecording) {
           sessionStorage.removeItem(`recording-active-${taskId}`)
-          // Recording was interrupted — show recovery UI instead of auto-redirecting
+          // Check if upload already completed (URLs saved to claim in DB)
+          try {
+            const claimRes = await fetch(`/api/tasks/${taskId}/my-claim`)
+            if (claimRes.ok) {
+              const claimData = await claimRes.json()
+              if (claimData.screenRecUrl || claimData.audioUrl) {
+                // Upload was completed before tab was discarded — go straight to submit
+                if (!cancelled) {
+                  router.push(`/tasks/${taskId}/submit`)
+                }
+                return
+              }
+            }
+          } catch {}
+          // No URLs in DB — recording was truly lost
           if (!cancelled) {
             setPhase('interrupted')
           }
