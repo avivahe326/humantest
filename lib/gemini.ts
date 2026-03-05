@@ -57,9 +57,9 @@ function getExtension(url: string): string {
   return '.webm'
 }
 
-async function extractKeyFrames(videoPath: string, maxFrames: number = 15): Promise<string[]> {
+async function extractKeyFrames(videoPath: string): Promise<string[]> {
   const dir = await mkdtemp(join(tmpdir(), 'frames-'))
-  const outputPattern = join(dir, 'frame-%03d.jpg')
+  const outputPattern = join(dir, 'frame-%04d.jpg')
 
   // Get video duration first
   let durationSec = 60
@@ -71,14 +71,13 @@ async function extractKeyFrames(videoPath: string, maxFrames: number = 15): Prom
     durationSec = Math.max(1, Math.floor(parseFloat(stdout.trim())))
   } catch {}
 
-  // Calculate interval to get evenly spaced frames
-  const interval = Math.max(1, Math.floor(durationSec / maxFrames))
+  // Extract 1 frame every 3 seconds
+  const interval = 3
 
   await execFileAsync('ffmpeg', [
     '-i', videoPath,
     '-vf', `fps=1/${interval}`,
     '-q:v', '5',
-    '-frames:v', String(maxFrames),
     outputPattern,
     '-y',
   ])
@@ -114,7 +113,7 @@ export async function analyzeMediaForFeedback(
   const tempFiles: string[] = []
 
   try {
-    const contentBlocks: Anthropic.Messages.ContentBlockParam[] = []
+    let allFramePaths: string[] = []
 
     // Extract key frames from screen recording
     if (feedback.screenRecUrl) {
@@ -125,36 +124,21 @@ export async function analyzeMediaForFeedback(
       try {
         const framePaths = await extractKeyFrames(videoPath)
         tempFiles.push(...framePaths)
-
-        for (let i = 0; i < framePaths.length; i++) {
-          const frameData = await readFile(framePaths[i])
-          const b64 = frameData.toString('base64')
-          contentBlocks.push({
-            type: 'text',
-            text: `[Screenshot ${i + 1}/${framePaths.length}]`,
-          })
-          contentBlocks.push({
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/jpeg', data: b64 },
-          })
-        }
+        allFramePaths = framePaths
       } catch (e) {
         console.warn('Failed to extract frames:', e)
-        contentBlocks.push({
-          type: 'text',
-          text: '[Video frame extraction failed — analyzing text feedback only]',
-        })
       }
     }
 
-    if (contentBlocks.length === 0 && !feedback.audioUrl) {
+    if (allFramePaths.length === 0 && !feedback.audioUrl) {
       return 'No media files were submitted for analysis.'
     }
 
     const testerName = feedback.user.name || 'Anonymous Tester'
+    const totalFrames = allFramePaths.length
 
-    const promptText = `You are a UX research analyst reviewing screenshots from a usability test screen recording.
-These are evenly-spaced key frames extracted from a screen recording of a real user testing the product "${task.title}" at ${task.targetUrl}.
+    const contextText = `You are a UX research analyst reviewing screenshots from a usability test screen recording.
+These are key frames extracted every 3 seconds from a screen recording of a real user testing the product "${task.title}" at ${task.targetUrl}.
 ${task.focus ? `Focus area: ${task.focus}` : ''}
 
 The tester (${testerName}) also provided this structured feedback:
@@ -164,9 +148,37 @@ The tester (${testerName}) also provided this structured feedback:
 - Worst Part: ${raw?.worst || 'N/A'}
 ${raw?.steps?.length ? `- Task Steps:\n${raw.steps.map((s) => `  - Step ${s.id}: ${s.answer}`).join('\n')}` : ''}
 ${feedback.textFeedback ? `- Additional Feedback: ${feedback.textFeedback}` : ''}
-${feedback.audioUrl ? `- Audio feedback was also recorded (URL: ${feedback.audioUrl})` : ''}
+${feedback.audioUrl ? `- Audio feedback was also recorded (URL: ${feedback.audioUrl})` : ''}`
 
-Analyze the screenshots carefully. They are in chronological order from the screen recording. Provide:
+    // Split frames into batches of 18 (leave room for text blocks)
+    const BATCH_SIZE = 18
+    const batches: string[][] = []
+    for (let i = 0; i < allFramePaths.length; i += BATCH_SIZE) {
+      batches.push(allFramePaths.slice(i, i + BATCH_SIZE))
+    }
+
+    if (batches.length <= 1) {
+      // Single batch — analyze directly
+      const contentBlocks: Anthropic.Messages.ContentBlockParam[] = []
+      for (let i = 0; i < allFramePaths.length; i++) {
+        const frameData = await readFile(allFramePaths[i])
+        const b64 = frameData.toString('base64')
+        const timeSec = i * 3
+        contentBlocks.push({
+          type: 'text',
+          text: `[Screenshot ${i + 1}/${totalFrames} — ~${timeSec}s]`,
+        })
+        contentBlocks.push({
+          type: 'image',
+          source: { type: 'base64', media_type: 'image/jpeg', data: b64 },
+        })
+      }
+
+      contentBlocks.push({
+        type: 'text',
+        text: `${contextText}
+
+Analyze the screenshots carefully. They are in chronological order (one every 3 seconds). Provide:
 1. **Timeline Summary** — key moments based on what you see in each screenshot
 2. **Excitement Points** — moments where the user appeared to engage positively with the product
 3. **Frustration Points** — moments showing confusion, errors, or dead ends
@@ -174,19 +186,95 @@ Analyze the screenshots carefully. They are in chronological order from the scre
 5. **Behavioral Observations** — navigation patterns, page transitions, areas of focus
 6. **Tester Verdict** — overall assessment based on screenshots + written feedback
 
-Use markdown formatting. Be specific about what you observed in each screenshot.`
+Use markdown formatting. Be specific about what you observed in each screenshot.`,
+      })
 
-    contentBlocks.push({ type: 'text', text: promptText })
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: contentBlocks }],
+        temperature: 0.3,
+      }, { timeout: 300000 })
 
-    const response = await anthropic.messages.create({
+      const text = response.content[0]
+      return (text && text.type === 'text') ? text.text : 'Analysis produced no output.'
+    }
+
+    // Multiple batches — analyze each batch, then merge
+    const batchAnalyses: string[] = []
+    let frameOffset = 0
+
+    for (let b = 0; b < batches.length; b++) {
+      const batch = batches[b]
+      const contentBlocks: Anthropic.Messages.ContentBlockParam[] = []
+
+      for (let i = 0; i < batch.length; i++) {
+        const frameData = await readFile(batch[i])
+        const b64 = frameData.toString('base64')
+        const globalIdx = frameOffset + i
+        const timeSec = globalIdx * 3
+        contentBlocks.push({
+          type: 'text',
+          text: `[Screenshot ${globalIdx + 1}/${totalFrames} — ~${timeSec}s]`,
+        })
+        contentBlocks.push({
+          type: 'image',
+          source: { type: 'base64', media_type: 'image/jpeg', data: b64 },
+        })
+      }
+
+      contentBlocks.push({
+        type: 'text',
+        text: `${contextText}
+
+This is batch ${b + 1}/${batches.length} of screenshots (frames ${frameOffset + 1}-${frameOffset + batch.length} of ${totalFrames} total, one every 3 seconds).
+
+Describe what you observe in these screenshots: what pages/screens are shown, what the user is doing, any signs of confusion or delight, UI issues, and notable interactions. Be specific and reference screenshot numbers.`,
+      })
+
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: contentBlocks }],
+        temperature: 0.3,
+      }, { timeout: 300000 })
+
+      const text = response.content[0]
+      if (text && text.type === 'text') {
+        batchAnalyses.push(`### Batch ${b + 1} (Screenshots ${frameOffset + 1}-${frameOffset + batch.length}, ~${frameOffset * 3}s-${(frameOffset + batch.length) * 3}s)\n${text.text}`)
+      }
+      frameOffset += batch.length
+    }
+
+    // Merge batch analyses into final report
+    const mergeResponse = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      messages: [{ role: 'user', content: contentBlocks }],
-      temperature: 0.5,
+      messages: [{
+        role: 'user',
+        content: `${contextText}
+
+Below are observations from ${batches.length} batches of screenshots extracted from the screen recording (${totalFrames} frames total, one every 3 seconds):
+
+${batchAnalyses.join('\n\n---\n\n')}
+
+---
+
+Now synthesize all observations into a single cohesive analysis:
+1. **Timeline Summary** — key moments with approximate timestamps
+2. **Excitement Points** — moments where the user appeared to engage positively
+3. **Frustration Points** — moments showing confusion, errors, or dead ends
+4. **Usage Friction** — specific UI/UX blockers observed
+5. **Behavioral Observations** — navigation patterns, page transitions, areas of focus
+6. **Tester Verdict** — overall assessment based on screenshots + written feedback
+
+Use markdown formatting. Be specific and reference timestamps.`,
+      }],
+      temperature: 0.3,
     }, { timeout: 300000 })
 
-    const text = response.content[0]
-    return (text && text.type === 'text') ? text.text : 'Analysis produced no output.'
+    const mergeText = mergeResponse.content[0]
+    return (mergeText && mergeText.type === 'text') ? mergeText.text : 'Analysis produced no output.'
   } finally {
     await cleanupFiles(tempFiles)
   }
