@@ -56,6 +56,41 @@ interface TaskDetailProps {
   feedbacks?: FeedbackData[]
 }
 
+function SyncedVideoAudio({ videoSrc, audioSrc }: { videoSrc: string; audioSrc: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+
+  useEffect(() => {
+    const video = videoRef.current
+    const audio = audioRef.current
+    if (!video || !audio) return
+
+    const onPlay = () => { audio.currentTime = video.currentTime; audio.play() }
+    const onPause = () => audio.pause()
+    const onSeeked = () => { audio.currentTime = video.currentTime }
+    const onVolumeChange = () => { audio.volume = video.volume; audio.muted = video.muted }
+
+    video.addEventListener('play', onPlay)
+    video.addEventListener('pause', onPause)
+    video.addEventListener('seeked', onSeeked)
+    video.addEventListener('volumechange', onVolumeChange)
+
+    return () => {
+      video.removeEventListener('play', onPlay)
+      video.removeEventListener('pause', onPause)
+      video.removeEventListener('seeked', onSeeked)
+      video.removeEventListener('volumechange', onVolumeChange)
+    }
+  }, [])
+
+  return (
+    <div>
+      <video ref={videoRef} controls preload="metadata" className="w-full rounded-lg border" src={videoSrc} />
+      <audio ref={audioRef} preload="metadata" src={audioSrc} className="hidden" />
+    </div>
+  )
+}
+
 export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedbacks: initialFeedbacks = [] }: TaskDetailProps) {
   const router = useRouter()
   const [claiming, setClaiming] = useState(false)
@@ -452,19 +487,23 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
                       <CollapsibleContent>
                         <CardContent className="space-y-4 pt-0">
-                          {/* Media players */}
-                          {fb.screenRecUrl && (
+                          {/* Media player — video with synced audio overlay */}
+                          {fb.screenRecUrl && fb.audioUrl ? (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Screen Recording + Audio</p>
+                              <SyncedVideoAudio videoSrc={fb.screenRecUrl} audioSrc={fb.audioUrl} />
+                            </div>
+                          ) : fb.screenRecUrl ? (
                             <div>
                               <p className="text-xs font-medium text-muted-foreground mb-1">Screen Recording</p>
                               <video controls preload="metadata" className="w-full rounded-lg border" src={fb.screenRecUrl} />
                             </div>
-                          )}
-                          {fb.audioUrl && (
+                          ) : fb.audioUrl ? (
                             <div>
                               <p className="text-xs font-medium text-muted-foreground mb-1">Audio Feedback</p>
                               <audio controls preload="metadata" className="w-full" src={fb.audioUrl} />
                             </div>
-                          )}
+                          ) : null}
 
                           {/* Text feedback */}
                           <div className="space-y-2">
