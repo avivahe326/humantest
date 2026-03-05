@@ -164,11 +164,14 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
     }
   }
 
-  async function handleGenerateReport() {
+  async function handleGenerateReport(regenerate = false) {
     setGeneratingReport(true)
     setError('')
     try {
-      const res = await fetch(`/api/tasks/${task.id}/generate-report`, { method: 'POST' })
+      const url = regenerate
+        ? `/api/tasks/${task.id}/generate-report?regenerate=1`
+        : `/api/tasks/${task.id}/generate-report`
+      const res = await fetch(url, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
         if (res.status === 409) {
@@ -265,7 +268,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
         {isCreator && task.status !== 'CANCELLED' && (
           <>
             {task.submittedCount >= 1 && !task.report && !isGenerating && reportStatus !== 'GENERATING' && (
-              <Button onClick={handleGenerateReport} disabled={generatingReport} variant="secondary">
+              <Button onClick={() => handleGenerateReport()} disabled={generatingReport} variant="secondary">
                 {generatingReport ? 'Starting...' : 'Generate Report Now'}
               </Button>
             )}
@@ -334,7 +337,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
           <CardContent className="pt-6 space-y-3">
             <p className="text-sm text-red-500">Report generation failed. Please try again.</p>
             {isCreator && (
-              <Button onClick={handleGenerateReport} disabled={generatingReport} variant="secondary" size="sm">
+              <Button onClick={() => handleGenerateReport()} disabled={generatingReport} variant="secondary" size="sm">
                 {generatingReport ? 'Starting...' : 'Retry Report Generation'}
               </Button>
             )}
@@ -497,7 +500,21 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       {/* Report display (public for COMPLETED tasks) */}
       {task.report && (
         <Card>
-          <CardHeader><CardTitle className="text-lg">Test Report</CardTitle></CardHeader>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Test Report</CardTitle>
+              {isCreator && !isGenerating && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleGenerateReport(true)}
+                  disabled={generatingReport}
+                >
+                  {generatingReport ? 'Regenerating...' : 'Regenerate Report'}
+                </Button>
+              )}
+            </div>
+          </CardHeader>
           <CardContent className="prose prose-invert max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {task.report}

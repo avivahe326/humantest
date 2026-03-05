@@ -12,6 +12,7 @@ export async function POST(
   if (error) return error
 
   const { id } = await params
+  const regenerate = request.nextUrl.searchParams.get('regenerate') === '1'
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -23,7 +24,21 @@ export async function POST(
 
       // 2. Status check with retry support (F2)
       if (task.status === 'CANCELLED') throw { appCode: 'CONFLICT', currentStatus: 'CANCELLED' }
-      if (task.status === 'COMPLETED' && task.report !== null) throw { appCode: 'REPORT_EXISTS' }
+      if (task.status === 'COMPLETED' && task.report !== null && !regenerate) throw { appCode: 'REPORT_EXISTS' }
+
+      // Regenerate path: clear existing report
+      if (task.status === 'COMPLETED' && task.report !== null && regenerate) {
+        await tx.task.update({
+          where: { id },
+          data: { report: null, reportStatus: null },
+        })
+        // Reset media analysis status so it re-analyzes
+        await tx.feedback.updateMany({
+          where: { taskId: id },
+          data: { mediaAnalysis: null, mediaAnalysisStatus: null },
+        })
+        return { refundAmount: 0 }
+      }
 
       // Retry path: COMPLETED but report failed previously — skip state changes
       if (task.status === 'COMPLETED' && task.report === null) {
