@@ -1,20 +1,16 @@
-import { GoogleGenAI, FileState, createPartFromUri } from '@google/genai'
-import { writeFile, unlink, mkdtemp } from 'fs/promises'
+import Anthropic from '@anthropic-ai/sdk'
+import { writeFile, unlink, mkdtemp, readFile, readdir } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 
-let client: GoogleGenAI | null = null
+const execFileAsync = promisify(execFile)
 
-function getGeminiClient(): GoogleGenAI {
-  if (client) return client
-  client = new GoogleGenAI({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    httpOptions: {
-      baseUrl: process.env.GEMINI_BASE_URL || 'https://api.aicodewith.com',
-    },
-  })
-  return client
-}
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.aicodewith.com',
+})
 
 interface RawData {
   firstImpression: string
@@ -40,29 +36,13 @@ interface TaskForAnalysis {
 }
 
 async function downloadToTemp(url: string, ext: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'gemini-'))
+  const dir = await mkdtemp(join(tmpdir(), 'media-'))
   const filePath = join(dir, `file${ext}`)
   const res = await fetch(url)
   if (!res.ok) throw new Error(`Failed to download ${url}: ${res.status}`)
   const buffer = Buffer.from(await res.arrayBuffer())
   await writeFile(filePath, buffer)
   return filePath
-}
-
-function getMimeType(url: string): string {
-  const lower = url.toLowerCase()
-  if (lower.includes('.webm')) return 'video/webm'
-  if (lower.includes('.mp4')) return 'video/mp4'
-  if (lower.includes('.mov')) return 'video/quicktime'
-  if (lower.includes('.avi')) return 'video/x-msvideo'
-  if (lower.includes('.ogg') && lower.includes('audio')) return 'audio/ogg'
-  if (lower.includes('.ogg')) return 'video/ogg'
-  if (lower.includes('.webm') && lower.includes('audio')) return 'audio/webm'
-  if (lower.includes('.mp3')) return 'audio/mpeg'
-  if (lower.includes('.wav')) return 'audio/wav'
-  if (lower.includes('.m4a')) return 'audio/mp4'
-  // Default based on context
-  return 'video/webm'
 }
 
 function getExtension(url: string): string {
@@ -77,52 +57,52 @@ function getExtension(url: string): string {
   return '.webm'
 }
 
-async function uploadAndWaitForActive(
-  ai: GoogleGenAI,
-  filePath: string,
-  mimeType: string,
-): Promise<string> {
-  const uploaded = await ai.files.upload({
-    file: filePath,
-    config: { mimeType },
-  })
+async function extractKeyFrames(videoPath: string, maxFrames: number = 15): Promise<string[]> {
+  const dir = await mkdtemp(join(tmpdir(), 'frames-'))
+  const outputPattern = join(dir, 'frame-%03d.jpg')
 
-  if (!uploaded.name) throw new Error('Upload returned no file name')
+  // Get video duration first
+  let durationSec = 60
+  try {
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v', 'error', '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1', videoPath,
+    ])
+    durationSec = Math.max(1, Math.floor(parseFloat(stdout.trim())))
+  } catch {}
 
-  // Poll until ACTIVE (max 5 minutes)
-  const maxWait = 5 * 60 * 1000
-  const interval = 2000
-  const start = Date.now()
+  // Calculate interval to get evenly spaced frames
+  const interval = Math.max(1, Math.floor(durationSec / maxFrames))
 
-  let file = uploaded
-  while (file.state === FileState.PROCESSING) {
-    if (Date.now() - start > maxWait) {
-      throw new Error(`File ${uploaded.name} stuck in PROCESSING after 5 minutes`)
-    }
-    await new Promise((r) => setTimeout(r, interval))
-    file = await ai.files.get({ name: uploaded.name! })
-  }
+  await execFileAsync('ffmpeg', [
+    '-i', videoPath,
+    '-vf', `fps=1/${interval}`,
+    '-q:v', '5',
+    '-frames:v', String(maxFrames),
+    outputPattern,
+    '-y',
+  ])
 
-  if (file.state === FileState.FAILED) {
-    throw new Error(`File processing failed: ${uploaded.name}`)
-  }
+  const files = await readdir(dir)
+  const framePaths = files
+    .filter(f => f.startsWith('frame-') && f.endsWith('.jpg'))
+    .sort()
+    .map(f => join(dir, f))
 
-  return uploaded.name
+  return framePaths
 }
 
-async function cleanupFile(ai: GoogleGenAI, fileName: string) {
-  try {
-    await ai.files.delete({ name: fileName })
-  } catch (e) {
-    console.warn('Failed to delete Gemini file:', fileName, e)
-  }
+async function transcribeAudio(audioPath: string): Promise<string | null> {
+  // Extract audio to wav, then use a simple approach:
+  // Send audio description request to Claude with context
+  // Since we can't directly transcribe, we'll note that audio exists
+  // and rely on the text feedback for content
+  return null
 }
 
-async function cleanupTempFile(filePath: string) {
-  try {
-    await unlink(filePath)
-  } catch {
-    // ignore
+async function cleanupFiles(paths: string[]) {
+  for (const p of paths) {
+    try { await unlink(p) } catch {}
   }
 }
 
@@ -130,54 +110,51 @@ export async function analyzeMediaForFeedback(
   feedback: FeedbackForAnalysis,
   task: TaskForAnalysis,
 ): Promise<string> {
-  const ai = getGeminiClient()
   const raw = feedback.rawData as RawData | null
   const tempFiles: string[] = []
-  const geminiFileNames: string[] = []
 
   try {
-    const fileParts: Array<ReturnType<typeof createPartFromUri>> = []
+    const contentBlocks: Anthropic.Messages.ContentBlockParam[] = []
 
-    // Upload screen recording
+    // Extract key frames from screen recording
     if (feedback.screenRecUrl) {
-      const mimeType = getMimeType(feedback.screenRecUrl)
       const ext = getExtension(feedback.screenRecUrl)
-      const tempPath = await downloadToTemp(feedback.screenRecUrl, ext)
-      tempFiles.push(tempPath)
+      const videoPath = await downloadToTemp(feedback.screenRecUrl, ext)
+      tempFiles.push(videoPath)
 
-      const fileName = await uploadAndWaitForActive(ai, tempPath, mimeType)
-      geminiFileNames.push(fileName)
+      try {
+        const framePaths = await extractKeyFrames(videoPath)
+        tempFiles.push(...framePaths)
 
-      const fileInfo = await ai.files.get({ name: fileName })
-      if (fileInfo.uri) {
-        fileParts.push(createPartFromUri(fileInfo.uri, mimeType))
+        for (let i = 0; i < framePaths.length; i++) {
+          const frameData = await readFile(framePaths[i])
+          const b64 = frameData.toString('base64')
+          contentBlocks.push({
+            type: 'text',
+            text: `[Screenshot ${i + 1}/${framePaths.length}]`,
+          })
+          contentBlocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: 'image/jpeg', data: b64 },
+          })
+        }
+      } catch (e) {
+        console.warn('Failed to extract frames:', e)
+        contentBlocks.push({
+          type: 'text',
+          text: '[Video frame extraction failed — analyzing text feedback only]',
+        })
       }
     }
 
-    // Upload audio
-    if (feedback.audioUrl) {
-      const mimeType = getMimeType(feedback.audioUrl)
-      const ext = getExtension(feedback.audioUrl)
-      const tempPath = await downloadToTemp(feedback.audioUrl, ext)
-      tempFiles.push(tempPath)
-
-      const fileName = await uploadAndWaitForActive(ai, tempPath, mimeType)
-      geminiFileNames.push(fileName)
-
-      const fileInfo = await ai.files.get({ name: fileName })
-      if (fileInfo.uri) {
-        fileParts.push(createPartFromUri(fileInfo.uri, mimeType))
-      }
-    }
-
-    if (fileParts.length === 0) {
+    if (contentBlocks.length === 0 && !feedback.audioUrl) {
       return 'No media files were submitted for analysis.'
     }
 
     const testerName = feedback.user.name || 'Anonymous Tester'
 
-    const promptText = `You are a UX research analyst reviewing a usability test recording.
-This is a screen recording of a real user testing the product "${task.title}" at ${task.targetUrl}.
+    const promptText = `You are a UX research analyst reviewing screenshots from a usability test screen recording.
+These are evenly-spaced key frames extracted from a screen recording of a real user testing the product "${task.title}" at ${task.targetUrl}.
 ${task.focus ? `Focus area: ${task.focus}` : ''}
 
 The tester (${testerName}) also provided this structured feedback:
@@ -187,66 +164,54 @@ The tester (${testerName}) also provided this structured feedback:
 - Worst Part: ${raw?.worst || 'N/A'}
 ${raw?.steps?.length ? `- Task Steps:\n${raw.steps.map((s) => `  - Step ${s.id}: ${s.answer}`).join('\n')}` : ''}
 ${feedback.textFeedback ? `- Additional Feedback: ${feedback.textFeedback}` : ''}
+${feedback.audioUrl ? `- Audio feedback was also recorded (URL: ${feedback.audioUrl})` : ''}
 
-Analyze the video and audio carefully. Provide:
-1. **Timeline Summary** — key moments with approximate timestamps
-2. **Excitement Points** — moments where the user showed positive engagement, delight, or satisfaction
-3. **Frustration Points** — moments where the user showed confusion, hesitation, or frustration
-4. **Usage Friction** — specific UI/UX blockers where the user got stuck or couldn't proceed
-5. **Behavioral Observations** — navigation patterns, mouse movements, repeated actions, verbal reactions
-6. **Tester Verdict** — overall assessment based on video behavior + written feedback
+Analyze the screenshots carefully. They are in chronological order from the screen recording. Provide:
+1. **Timeline Summary** — key moments based on what you see in each screenshot
+2. **Excitement Points** — moments where the user appeared to engage positively with the product
+3. **Frustration Points** — moments showing confusion, errors, or dead ends
+4. **Usage Friction** — specific UI/UX blockers visible in the screenshots
+5. **Behavioral Observations** — navigation patterns, page transitions, areas of focus
+6. **Tester Verdict** — overall assessment based on screenshots + written feedback
 
-Use markdown formatting. Be specific about what you observed.`
+Use markdown formatting. Be specific about what you observed in each screenshot.`
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro-preview-06-05',
-      contents: [
-        {
-          role: 'user',
-          parts: [...fileParts, { text: promptText }],
-        },
-      ],
-      config: {
-        temperature: 0.5,
-      },
-    })
+    contentBlocks.push({ type: 'text', text: promptText })
 
-    return response.text ?? 'Analysis produced no output.'
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: contentBlocks }],
+      temperature: 0.5,
+    }, { timeout: 300000 })
+
+    const text = response.content[0]
+    return (text && text.type === 'text') ? text.text : 'Analysis produced no output.'
   } finally {
-    // Cleanup
-    for (const f of tempFiles) await cleanupTempFile(f)
-    for (const f of geminiFileNames) await cleanupFile(ai, f)
+    await cleanupFiles(tempFiles)
   }
+}
+
+interface FeedbackAnalysisInput {
+  testerName: string
+  mediaAnalysis: string | null
+  textFeedback: string | null
+  nps: number | null
 }
 
 export async function generateAggregateReport(
   task: TaskForAnalysis,
-  feedbackAnalyses: Array<{
-    testerName: string
-    mediaAnalysis: string | null
-    textFeedback: string | null
-    rawData: unknown
-    nps: number | null
-  }>,
+  feedbackAnalyses: FeedbackAnalysisInput[],
 ): Promise<string> {
-  const ai = getGeminiClient()
-
   const testerSections = feedbackAnalyses
     .map((fb, i) => {
-      const raw = fb.rawData as RawData | null
-      return `---
-### Tester ${i + 1}: ${fb.testerName}
+      const label = fb.testerName || `Tester ${i + 1}`
+      return `## ${label}
 **NPS Score:** ${fb.nps ?? 'N/A'}/10
-**First Impression:** ${raw?.firstImpression || 'N/A'}
-**Best Part:** ${raw?.best || 'N/A'}
-**Worst Part:** ${raw?.worst || 'N/A'}
-${raw?.steps?.length ? `**Task Steps:**\n${raw.steps.map((s) => `- Step ${s.id}: ${s.answer}`).join('\n')}` : ''}
-${fb.textFeedback ? `**Additional Feedback:** ${fb.textFeedback}` : ''}
-
-**Media Analysis:**
-${fb.mediaAnalysis || '_No media analysis available_'}`
+${fb.mediaAnalysis ? `### Video Analysis:\n${fb.mediaAnalysis}` : '### Video Analysis:\nNo recording submitted.'}
+${fb.textFeedback ? `### Text Feedback:\n${fb.textFeedback}` : ''}`
     })
-    .join('\n\n')
+    .join('\n\n---\n\n')
 
   const npsScores = feedbackAnalyses
     .map((fb) => fb.nps)
@@ -276,13 +241,13 @@ Generate a comprehensive usability test report with:
 
 Use markdown formatting. Reference specific testers and their video observations when citing evidence.`
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-pro-preview-06-05',
-    contents: prompt,
-    config: {
-      temperature: 0.5,
-    },
-  })
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 4096,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.5,
+  }, { timeout: 300000 })
 
-  return response.text ?? 'Aggregate report generation produced no output.'
+  const text = response.content[0]
+  return (text && text.type === 'text') ? text.text : 'Aggregate report generation produced no output.'
 }
