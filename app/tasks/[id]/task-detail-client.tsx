@@ -180,7 +180,10 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   // Start/stop progress animation
   useEffect(() => {
     if (isGenerating) {
-      startTimeRef.current = Date.now()
+      // If startTime not set yet, use now (will be corrected by first poll)
+      if (!startTimeRef.current) {
+        startTimeRef.current = Date.now()
+      }
       animFrameRef.current = requestAnimationFrame(updateProgress)
     } else {
       cancelAnimationFrame(animFrameRef.current)
@@ -192,11 +195,18 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   // Poll report status with per-feedback info
   useEffect(() => {
     if (!isGenerating) return
-    const interval = setInterval(async () => {
+
+    // Immediately fetch to get server updatedAt for accurate progress
+    const fetchStatus = async () => {
       try {
         const res = await fetch(`/api/tasks/${task.id}/report-status`)
         if (!res.ok) return
         const data = await res.json()
+
+        // Use server updatedAt to set accurate start time
+        if (data.updatedAt && data.reportStatus === 'GENERATING') {
+          startTimeRef.current = new Date(data.updatedAt).getTime()
+        }
 
         if (data.feedbacks) {
           setFeedbackStatuses(data.feedbacks)
@@ -209,8 +219,11 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
             setTimeout(() => router.refresh(), 500)
           }
         }
-      } catch { /* ignore polling errors */ }
-    }, 3000)
+      } catch { /* ignore */ }
+    }
+
+    fetchStatus()
+    const interval = setInterval(fetchStatus, 3000)
     return () => clearInterval(interval)
   }, [isGenerating, task.id, router])
 

@@ -13,7 +13,7 @@ export async function GET(
 
   const task = await prisma.task.findUnique({
     where: { id },
-    select: { reportStatus: true, report: true, creatorId: true },
+    select: { reportStatus: true, report: true, creatorId: true, updatedAt: true },
   })
 
   if (!task) {
@@ -25,6 +25,7 @@ export async function GET(
   const response: Record<string, unknown> = {
     reportStatus: task.reportStatus,
     hasReport: task.report !== null,
+    updatedAt: task.updatedAt.toISOString(),
   }
 
   // Include per-feedback analysis status for the task creator
