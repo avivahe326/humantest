@@ -187,8 +187,8 @@ export async function generateReport(taskId: string): Promise<string> {
 
   const report = await generateAggregateReport(task, feedbackAnalyses)
 
-  await prisma.task.updateMany({
-    where: { id: taskId, report: null },
+  await prisma.task.update({
+    where: { id: taskId },
     data: { report, reportStatus: 'COMPLETED' },
   })
 
