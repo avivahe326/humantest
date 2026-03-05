@@ -517,7 +517,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
               </Card>
             )}
 
-            {!report && !isGenerating && reportStatus !== 'FAILED' && (
+            {!report && !isGenerating && !generatingReport && reportStatus !== 'FAILED' && (
               <p className="text-sm text-muted-foreground text-center py-8">No report generated yet.</p>
             )}
           </TabsContent>
