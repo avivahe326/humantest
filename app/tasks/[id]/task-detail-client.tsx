@@ -265,6 +265,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
     setError('')
     if (regenerate) {
       setReport(null)
+      setReportStatus('GENERATING')
       setProgress(0)
     }
     try {
