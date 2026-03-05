@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,26 @@ interface TestStep {
 }
 
 const STORAGE_KEY_PREFIX = 'human-test-draft-'
+
+function FixedVideo({ src, className }: { src: string; className?: string }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    const video = ref.current
+    if (!video) return
+    const fix = () => {
+      if (video.duration === Infinity || isNaN(video.duration)) {
+        video.currentTime = 1e10
+        video.addEventListener('timeupdate', function handler() {
+          video.removeEventListener('timeupdate', handler)
+          video.currentTime = 0
+        })
+      }
+    }
+    video.addEventListener('loadedmetadata', fix)
+    return () => video.removeEventListener('loadedmetadata', fix)
+  }, [])
+  return <video ref={ref} controls preload="metadata" playsInline className={className} src={src} />
+}
 
 export default function SubmitFeedbackPage() {
   const { data: session, status: authStatus } = useSession()
@@ -300,7 +320,7 @@ export default function SubmitFeedbackPage() {
               </div>
               <Input value={screenRecUrl} onChange={e => setScreenRecUrl(e.target.value)} placeholder="https://www.loom.com/..." readOnly={autoRecorded && !!screenRecUrl} className={autoRecorded && screenRecUrl ? 'opacity-70' : ''} />
               {screenRecUrl && (
-                <video controls preload="metadata" className="w-full rounded-lg border mt-2" src={screenRecUrl} />
+                <FixedVideo src={screenRecUrl} className="w-full rounded-lg border mt-2" />
               )}
             </div>
             <div className="space-y-2">

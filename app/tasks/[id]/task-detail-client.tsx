@@ -56,6 +56,26 @@ interface TaskDetailProps {
   feedbacks?: FeedbackData[]
 }
 
+function FixedVideo({ src, className }: { src: string; className?: string }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    const video = ref.current
+    if (!video) return
+    const fix = () => {
+      if (video.duration === Infinity || isNaN(video.duration)) {
+        video.currentTime = 1e10
+        video.addEventListener('timeupdate', function handler() {
+          video.removeEventListener('timeupdate', handler)
+          video.currentTime = 0
+        })
+      }
+    }
+    video.addEventListener('loadedmetadata', fix)
+    return () => video.removeEventListener('loadedmetadata', fix)
+  }, [])
+  return <video ref={ref} controls preload="metadata" playsInline className={className} src={src} />
+}
+
 function SyncedVideoAudio({ videoSrc, audioSrc }: { videoSrc: string; audioSrc: string }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -65,27 +85,65 @@ function SyncedVideoAudio({ videoSrc, audioSrc }: { videoSrc: string; audioSrc: 
     const audio = audioRef.current
     if (!video || !audio) return
 
-    const onPlay = () => { audio.currentTime = video.currentTime; audio.play() }
+    // Fix webm missing duration: seek to a huge time to force browser to calculate it
+    const fixDuration = () => {
+      if (video.duration === Infinity || isNaN(video.duration)) {
+        video.currentTime = 1e10
+        video.addEventListener('timeupdate', function handler() {
+          video.removeEventListener('timeupdate', handler)
+          video.currentTime = 0
+        })
+      }
+    }
+    video.addEventListener('loadedmetadata', fixDuration)
+
+    const syncAudio = () => {
+      const timeDiff = Math.abs(video.currentTime - audio.currentTime)
+      if (timeDiff > 0.3) {
+        audio.currentTime = video.currentTime
+      }
+    }
+
+    const onPlay = () => {
+      audio.currentTime = video.currentTime
+      audio.play().catch(() => {})
+    }
     const onPause = () => audio.pause()
-    const onSeeked = () => { audio.currentTime = video.currentTime }
-    const onVolumeChange = () => { audio.volume = video.volume; audio.muted = video.muted }
+    const onSeeking = () => {
+      audio.currentTime = video.currentTime
+    }
+    const onTimeUpdate = () => syncAudio()
+    const onVolumeChange = () => {
+      audio.volume = video.volume
+      audio.muted = video.muted
+    }
 
     video.addEventListener('play', onPlay)
     video.addEventListener('pause', onPause)
-    video.addEventListener('seeked', onSeeked)
+    video.addEventListener('seeking', onSeeking)
+    video.addEventListener('timeupdate', onTimeUpdate)
     video.addEventListener('volumechange', onVolumeChange)
 
     return () => {
+      video.removeEventListener('loadedmetadata', fixDuration)
       video.removeEventListener('play', onPlay)
       video.removeEventListener('pause', onPause)
-      video.removeEventListener('seeked', onSeeked)
+      video.removeEventListener('seeking', onSeeking)
+      video.removeEventListener('timeupdate', onTimeUpdate)
       video.removeEventListener('volumechange', onVolumeChange)
     }
   }, [])
 
   return (
     <div>
-      <video ref={videoRef} controls preload="metadata" className="w-full rounded-lg border" src={videoSrc} />
+      <video
+        ref={videoRef}
+        controls
+        preload="metadata"
+        className="w-full rounded-lg border"
+        src={videoSrc}
+        playsInline
+      />
       <audio ref={audioRef} preload="metadata" src={audioSrc} className="hidden" />
     </div>
   )
@@ -496,7 +554,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                           ) : fb.screenRecUrl ? (
                             <div>
                               <p className="text-xs font-medium text-muted-foreground mb-1">Screen Recording</p>
-                              <video controls preload="metadata" className="w-full rounded-lg border" src={fb.screenRecUrl} />
+                              <FixedVideo src={fb.screenRecUrl} className="w-full rounded-lg border" />
                             </div>
                           ) : fb.audioUrl ? (
                             <div>
