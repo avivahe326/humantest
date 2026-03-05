@@ -71,13 +71,13 @@ async function extractKeyFrames(videoPath: string): Promise<string[]> {
     durationSec = Math.max(1, Math.floor(parseFloat(stdout.trim())))
   } catch {}
 
-  // Extract 1 frame every 3 seconds
+  // Extract 1 frame every 3 seconds, resize to 1280px wide, lower quality
   const interval = 3
 
   await execFileAsync('ffmpeg', [
     '-i', videoPath,
-    '-vf', `fps=1/${interval}`,
-    '-q:v', '5',
+    '-vf', `fps=1/${interval},scale=1280:-2`,
+    '-q:v', '8',
     outputPattern,
     '-y',
   ])
@@ -150,8 +150,8 @@ ${raw?.steps?.length ? `- Task Steps:\n${raw.steps.map((s) => `  - Step ${s.id}:
 ${feedback.textFeedback ? `- Additional Feedback: ${feedback.textFeedback}` : ''}
 ${feedback.audioUrl ? `- Audio feedback was also recorded (URL: ${feedback.audioUrl})` : ''}`
 
-    // Split frames into batches of 18 (leave room for text blocks)
-    const BATCH_SIZE = 18
+    // Split frames into batches of 8 (keep total request under 4.5MB proxy limit)
+    const BATCH_SIZE = 8
     const batches: string[][] = []
     for (let i = 0; i < allFramePaths.length; i += BATCH_SIZE) {
       batches.push(allFramePaths.slice(i, i + BATCH_SIZE))
