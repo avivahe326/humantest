@@ -342,6 +342,18 @@ export function useMediaRecorder({
     }
 
     if (mountedRef.current) setStatus('done')
+
+    // Persist URLs to database so they survive tab discards
+    try {
+      await fetch(`/api/tasks/${taskId}/my-claim`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ screenRecUrl: screenUrl, audioUrl: audioUrlResult }),
+      })
+    } catch (e) {
+      console.warn('Failed to persist recording URLs to claim:', e)
+    }
+
     return { screenRecUrl: screenUrl!, audioUrl: audioUrlResult! }
   }, [screenRecUrl, audioUrl])
 

@@ -51,7 +51,7 @@ export default function SubmitFeedbackPage() {
 
   const storageKey = STORAGE_KEY_PREFIX + taskId
 
-  // Load recording URLs from sessionStorage (priority), localStorage, query params, then draft
+  // Load recording URLs from sessionStorage (priority), localStorage, query params, claim API, then draft
   useEffect(() => {
     // 1. Check sessionStorage (coming from recording page)
     const recordingKey = `recording-urls-${taskId}`
@@ -59,36 +59,29 @@ export default function SubmitFeedbackPage() {
 
     const tryLoadRecordingUrls = (storage: Storage, storageName: string) => {
       const data = storage.getItem(recordingKey)
-      console.log(`[Submit] Checking ${storageName} for recording URLs:`, data)
       if (!data) return false
       try {
         const { screenRecUrl: sUrl, audioUrl: aUrl } = JSON.parse(data)
-        console.log(`[Submit] Parsed URLs from ${storageName}:`, { sUrl, aUrl })
         let found = false
         if (sUrl) { setScreenRecUrl(sUrl); found = true }
         if (aUrl) { setAudioUrl(aUrl); found = true }
         if (found) setAutoRecorded(true)
         return found
-      } catch (e) {
-        console.error(`[Submit] Failed to parse ${storageName} data:`, e)
-        return false
-      }
+      } catch { return false }
     }
 
     // Try sessionStorage first, then localStorage
     fromRecording = tryLoadRecordingUrls(sessionStorage, 'sessionStorage') || tryLoadRecordingUrls(localStorage, 'localStorage')
     if (fromRecording) {
-      console.log('[Submit] Loaded recording URLs, cleaning up storage')
       try { sessionStorage.removeItem(recordingKey) } catch {}
       try { localStorage.removeItem(recordingKey) } catch {}
       return
     }
 
-    // 1b. Fallback: check URL query params (sessionStorage write failure fallback)
+    // 1b. Fallback: check URL query params
     const urlParams = new URLSearchParams(window.location.search)
     const qScreen = urlParams.get('screenRecUrl')
     const qAudio = urlParams.get('audioUrl')
-    console.log('[Submit] Checking URL params:', { qScreen, qAudio })
     if (qScreen || qAudio) {
       if (qScreen) setScreenRecUrl(qScreen)
       if (qAudio) setAudioUrl(qAudio)
@@ -97,21 +90,47 @@ export default function SubmitFeedbackPage() {
       return
     }
 
-    // 2. Otherwise restore from localStorage draft (existing logic)
-    try {
-      const draft = localStorage.getItem(storageKey)
-      if (draft) {
-        const parsed = JSON.parse(draft)
-        console.log('[Submit] Restored draft from localStorage:', parsed)
-        if (parsed.firstImpression) setFirstImpression(parsed.firstImpression)
-        if (parsed.stepAnswers) setStepAnswers(parsed.stepAnswers)
-        if (parsed.nps) setNps(parsed.nps)
-        if (parsed.best) setBest(parsed.best)
-        if (parsed.worst) setWorst(parsed.worst)
-        if (parsed.screenRecUrl) setScreenRecUrl(parsed.screenRecUrl)
-        if (parsed.audioUrl) setAudioUrl(parsed.audioUrl)
-      }
-    } catch {}
+    // 1c. Fallback: fetch recording URLs from claim in database
+    fetch(`/api/tasks/${taskId}/my-claim`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.screenRecUrl || data?.audioUrl) {
+          if (data.screenRecUrl) setScreenRecUrl(data.screenRecUrl)
+          if (data.audioUrl) setAudioUrl(data.audioUrl)
+          setAutoRecorded(true)
+          return
+        }
+        // 2. No recording URLs anywhere — restore from localStorage draft
+        try {
+          const draft = localStorage.getItem(storageKey)
+          if (draft) {
+            const parsed = JSON.parse(draft)
+            if (parsed.firstImpression) setFirstImpression(parsed.firstImpression)
+            if (parsed.stepAnswers) setStepAnswers(parsed.stepAnswers)
+            if (parsed.nps) setNps(parsed.nps)
+            if (parsed.best) setBest(parsed.best)
+            if (parsed.worst) setWorst(parsed.worst)
+            if (parsed.screenRecUrl) setScreenRecUrl(parsed.screenRecUrl)
+            if (parsed.audioUrl) setAudioUrl(parsed.audioUrl)
+          }
+        } catch {}
+      })
+      .catch(() => {
+        // API failed — try draft
+        try {
+          const draft = localStorage.getItem(storageKey)
+          if (draft) {
+            const parsed = JSON.parse(draft)
+            if (parsed.firstImpression) setFirstImpression(parsed.firstImpression)
+            if (parsed.stepAnswers) setStepAnswers(parsed.stepAnswers)
+            if (parsed.nps) setNps(parsed.nps)
+            if (parsed.best) setBest(parsed.best)
+            if (parsed.worst) setWorst(parsed.worst)
+            if (parsed.screenRecUrl) setScreenRecUrl(parsed.screenRecUrl)
+            if (parsed.audioUrl) setAudioUrl(parsed.audioUrl)
+          }
+        } catch {}
+      })
   }, [storageKey, taskId])
 
   // Save draft to localStorage

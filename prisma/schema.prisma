@@ -49,14 +49,16 @@ model Task {
 }
 
 model TaskClaim {
-  id        String      @id @default(cuid())
-  taskId    String
-  userId    String
-  status    ClaimStatus @default(IN_PROGRESS)
-  claimedAt DateTime    @default(now())
-  task      Task        @relation(fields: [taskId], references: [id])
-  user      User        @relation(fields: [userId], references: [id])
-  feedback  Feedback?
+  id           String      @id @default(cuid())
+  taskId       String
+  userId       String
+  status       ClaimStatus @default(IN_PROGRESS)
+  screenRecUrl String?     @db.VarChar(2000)
+  audioUrl     String?     @db.VarChar(2000)
+  claimedAt    DateTime    @default(now())
+  task         Task        @relation(fields: [taskId], references: [id])
+  user         User        @relation(fields: [userId], references: [id])
+  feedback     Feedback?
 
   @@unique([taskId, userId])
   @@index([userId])
