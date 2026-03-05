@@ -22,7 +22,7 @@ interface TaskInfo {
   requirements: { steps: TestStep[] } | null
 }
 
-type Phase = 'loading' | 'error' | 'ready' | 'recording' | 'uploading' | 'done' | 'interrupted'
+type Phase = 'loading' | 'error' | 'ready' | 'recording' | 'uploading' | 'done' | 'interrupted' | 'recovery'
 
 export default function IntegratedTestPage() {
   const { data: session, status: authStatus } = useSession()
@@ -58,30 +58,30 @@ export default function IntegratedTestPage() {
         // Check if there was a recording session in progress (tab was discarded)
         const wasRecording = sessionStorage.getItem(`recording-active-${taskId}`)
         if (wasRecording) {
-          sessionStorage.removeItem(`recording-active-${taskId}`)
+          // Don't remove the flag yet — user might choose to continue testing
           // Check if upload already completed (URLs saved to claim in DB)
           try {
             const claimRes = await fetch(`/api/tasks/${taskId}/my-claim`)
             if (claimRes.ok) {
               const claimData = await claimRes.json()
               if (claimData.screenRecUrl || claimData.audioUrl) {
+                sessionStorage.removeItem(`recording-active-${taskId}`)
                 if (!cancelled) router.push(`/tasks/${taskId}/submit`)
                 return
               }
-              // Try to recover chunks from IndexedDB and upload
-              if (!cancelled) {
-                setPhase('uploading')
-                const recovered = await recorder.recoverAndUpload(taskId, claimData.claimId)
-                if (recovered) {
-                  if (!cancelled) router.push(`/tasks/${taskId}/submit`)
-                  return
-                }
-              }
             }
           } catch {}
-          // No URLs and no recoverable chunks
+          // Show recovery choice UI
           if (!cancelled) {
-            setPhase('interrupted')
+            // Load task info so we can show the target URL
+            try {
+              const infoRes = await fetch(`/api/tasks/${taskId}/info`)
+              if (infoRes.ok) {
+                const taskData = await infoRes.json()
+                if (!cancelled) setTask(taskData)
+              }
+            } catch {}
+            setPhase('recovery')
           }
           return
         }
@@ -393,7 +393,61 @@ export default function IntegratedTestPage() {
     )
   }
 
-  // Phase: Interrupted (tab was discarded during recording)
+  // Phase: Recovery — user returned to recording tab after it was discarded
+  if (phase === 'recovery') {
+    const handleContinueTesting = () => {
+      // Keep recording-active flag, reopen target website
+      if (task?.targetUrl) {
+        window.open(task.targetUrl, '_blank')
+      }
+    }
+
+    const handleStopAndUpload = async () => {
+      sessionStorage.removeItem(`recording-active-${taskId}`)
+      setPhase('uploading')
+      try {
+        const claimRes = await fetch(`/api/tasks/${taskId}/my-claim`)
+        if (!claimRes.ok) throw new Error('No claim')
+        const { claimId } = await claimRes.json()
+        const recovered = await recorder.recoverAndUpload(taskId, claimId)
+        if (recovered) {
+          router.push(`/tasks/${taskId}/submit`)
+        } else {
+          setPhase('interrupted')
+        }
+      } catch {
+        setPhase('interrupted')
+      }
+    }
+
+    const handleSkipRecording = () => {
+      sessionStorage.removeItem(`recording-active-${taskId}`)
+      router.push(`/tasks/${taskId}/submit`)
+    }
+
+    return (
+      <div className="mx-auto max-w-md py-12 space-y-6 text-center">
+        <Monitor className="h-12 w-12 text-primary mx-auto" />
+        <h2 className="text-lg font-bold">Recording in progress</h2>
+        <p className="text-sm text-muted-foreground">
+          You have an active recording session. What would you like to do?
+        </p>
+        <div className="flex flex-col gap-3">
+          <Button onClick={handleContinueTesting}>
+            Continue testing
+          </Button>
+          <Button variant="secondary" onClick={handleStopAndUpload}>
+            Stop recording & submit
+          </Button>
+          <Button variant="outline" onClick={handleSkipRecording}>
+            Discard recording & submit
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Phase: Interrupted (tab was discarded, no recoverable data)
   if (phase === 'interrupted') {
     return (
       <div className="mx-auto max-w-md py-12 space-y-6 text-center">
