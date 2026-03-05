@@ -299,6 +299,9 @@ export default function SubmitFeedbackPage() {
                 {autoRecorded && screenRecUrl && <Badge variant="secondary">Auto Recorded</Badge>}
               </div>
               <Input value={screenRecUrl} onChange={e => setScreenRecUrl(e.target.value)} placeholder="https://www.loom.com/..." readOnly={autoRecorded && !!screenRecUrl} className={autoRecorded && screenRecUrl ? 'opacity-70' : ''} />
+              {screenRecUrl && (
+                <video controls preload="metadata" className="w-full rounded-lg border mt-2" src={screenRecUrl} />
+              )}
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
@@ -306,6 +309,9 @@ export default function SubmitFeedbackPage() {
                 {autoRecorded && audioUrl && <Badge variant="secondary">Auto Recorded</Badge>}
               </div>
               <Input value={audioUrl} onChange={e => setAudioUrl(e.target.value)} placeholder="https://..." readOnly={autoRecorded && !!audioUrl} className={autoRecorded && audioUrl ? 'opacity-70' : ''} />
+              {audioUrl && (
+                <audio controls preload="metadata" className="w-full mt-2" src={audioUrl} />
+              )}
             </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
