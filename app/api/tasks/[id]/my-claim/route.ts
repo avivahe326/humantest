@@ -50,16 +50,16 @@ export async function PATCH(
     return NextResponse.json({ error: 'No active claim found' }, { status: 404 })
   }
 
-  const data: Record<string, string> = {}
-  if (body.screenRecUrl && typeof body.screenRecUrl === 'string') {
-    data.screenRecUrl = body.screenRecUrl
+  const data: Record<string, string | null> = {}
+  if (typeof body.screenRecUrl === 'string') {
+    data.screenRecUrl = body.screenRecUrl || null
   }
-  if (body.audioUrl && typeof body.audioUrl === 'string') {
-    data.audioUrl = body.audioUrl
+  if (typeof body.audioUrl === 'string') {
+    data.audioUrl = body.audioUrl || null
   }
 
   if (Object.keys(data).length === 0) {
-    return NextResponse.json({ error: 'No URLs provided' }, { status: 400 })
+    return NextResponse.json({ error: 'No fields provided' }, { status: 400 })
   }
 
   await prisma.taskClaim.update({

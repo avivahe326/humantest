@@ -22,7 +22,7 @@ interface TaskInfo {
   requirements: { steps: TestStep[] } | null
 }
 
-type Phase = 'loading' | 'error' | 'ready' | 'recording' | 'uploading' | 'done' | 'interrupted' | 'recovery'
+type Phase = 'loading' | 'error' | 'ready' | 'recording' | 'uploading' | 'done' | 'interrupted' | 'recovery' | 'has-recording'
 
 export default function IntegratedTestPage() {
   const { data: session, status: authStatus } = useSession()
@@ -57,6 +57,7 @@ export default function IntegratedTestPage() {
       try {
         // Check if there was a recording session in progress (tab was discarded)
         const wasRecording = sessionStorage.getItem(`recording-active-${taskId}`)
+        console.log('[Test] wasRecording flag:', wasRecording)
         if (wasRecording) {
           // Don't remove the flag yet — user might choose to continue testing
           // Check if upload already completed (URLs saved to claim in DB)
@@ -64,14 +65,19 @@ export default function IntegratedTestPage() {
             const claimRes = await fetch(`/api/tasks/${taskId}/my-claim`)
             if (claimRes.ok) {
               const claimData = await claimRes.json()
+              console.log('[Test] Claim data:', claimData)
               if (claimData.screenRecUrl || claimData.audioUrl) {
+                console.log('[Test] URLs already exist, redirecting to submit')
                 sessionStorage.removeItem(`recording-active-${taskId}`)
                 if (!cancelled) router.push(`/tasks/${taskId}/submit`)
                 return
               }
             }
-          } catch {}
+          } catch (e) {
+            console.error('[Test] Failed to fetch claim:', e)
+          }
           // Show recovery choice UI
+          console.log('[Test] Showing recovery UI')
           if (!cancelled) {
             // Load task info so we can show the target URL
             try {
@@ -99,8 +105,13 @@ export default function IntegratedTestPage() {
 
         const claimRes = await fetch(`/api/tasks/${taskId}/my-claim`)
         if (claimRes.ok) {
-          const { claimId: existingClaimId } = await claimRes.json()
-          if (!cancelled) setClaimId(existingClaimId)
+          const claimData = await claimRes.json()
+          if (!cancelled) setClaimId(claimData.claimId)
+          // Check if there's already a recording from a previous session
+          if (claimData.screenRecUrl || claimData.audioUrl) {
+            if (!cancelled) setPhase('has-recording')
+            return
+          }
         } else {
           if (!cancelled) {
             setErrorMsg('You have not claimed this task yet. Please go back and claim it first.')
@@ -222,6 +233,43 @@ export default function IntegratedTestPage() {
       <div className="mx-auto max-w-lg py-12 text-center space-y-4">
         <h1 className="text-xl font-bold text-red-500">{errorMsg}</h1>
         <Button onClick={() => router.push(`/tasks/${taskId}`)}>Back to Task</Button>
+      </div>
+    )
+  }
+
+  // Phase: Has existing recording — ask user what to do
+  if (phase === 'has-recording' && task) {
+    const handleUseExisting = () => {
+      router.push(`/tasks/${taskId}/submit`)
+    }
+
+    const handleReRecord = async () => {
+      // Clear existing recording URLs from claim
+      try {
+        await fetch(`/api/tasks/${taskId}/my-claim`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ screenRecUrl: '', audioUrl: '' }),
+        })
+      } catch {}
+      setPhase('ready')
+    }
+
+    return (
+      <div className="mx-auto max-w-md py-12 space-y-6 text-center">
+        <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
+        <h2 className="text-lg font-bold">You already have a recording</h2>
+        <p className="text-sm text-muted-foreground">
+          A screen recording from a previous session was found. Would you like to use it or record a new one?
+        </p>
+        <div className="flex flex-col gap-3">
+          <Button onClick={handleUseExisting}>
+            Use existing recording & submit
+          </Button>
+          <Button variant="outline" onClick={handleReRecord}>
+            Record a new one
+          </Button>
+        </div>
       </div>
     )
   }
