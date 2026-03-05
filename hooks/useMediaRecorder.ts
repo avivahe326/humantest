@@ -99,6 +99,7 @@ export function useMediaRecorder({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
   const mountedRef = useRef(true)
+  const lockReleaseRef = useRef<(() => void) | null>(null)
 
   // Cleanup on unmount
   useEffect(() => {
@@ -112,6 +113,11 @@ export function useMediaRecorder({
       // Stop recorders if active
       try { screenRecorderRef.current?.stop() } catch {}
       try { audioRecorderRef.current?.stop() } catch {}
+      // Release web lock
+      if (lockReleaseRef.current) {
+        lockReleaseRef.current()
+        lockReleaseRef.current = null
+      }
     }
   }, [])
 
@@ -157,6 +163,11 @@ export function useMediaRecorder({
 
     Promise.all([screenDone, audioDone]).then(() => {
       stopAllTracks()
+      // Release the web lock so browser can manage tab normally again
+      if (lockReleaseRef.current) {
+        lockReleaseRef.current()
+        lockReleaseRef.current = null
+      }
       if (mountedRef.current) setStatus('completed')
     })
   }, [stopAllTracks])
@@ -243,6 +254,16 @@ export function useMediaRecorder({
     audioRecorder.start(1000)
     startTimeRef.current = Date.now()
     setStatus('recording')
+
+    // Prevent browser from discarding this tab during recording
+    // Web Locks API keeps the tab alive while the lock is held
+    if (navigator.locks) {
+      navigator.locks.request('recording-active', { mode: 'exclusive' }, () => {
+        return new Promise<void>((resolve) => {
+          lockReleaseRef.current = resolve
+        })
+      }).catch(() => {})
+    }
 
     // Duration timer + auto-stop
     timerRef.current = setInterval(() => {
