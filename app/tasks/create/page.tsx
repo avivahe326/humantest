@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useTranslation } from '@/lib/i18n'
 
 interface TestStep {
   id: string
@@ -23,6 +24,7 @@ export default function CreateTaskPage() {
   const [error, setError] = useState('')
   const [credits, setCredits] = useState<number>(0)
   const [steps, setSteps] = useState<TestStep[]>([])
+  const { t } = useTranslation()
 
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
@@ -62,7 +64,7 @@ export default function CreateTaskPage() {
       const plan = await res.json()
       setSteps(plan.steps || [])
     } catch {
-      setError('Failed to generate test plan. You can still submit without a preview.')
+      setError(t('createTask.generateFailed'))
     } finally {
       setPreviewLoading(false)
     }
@@ -102,7 +104,7 @@ export default function CreateTaskPage() {
       const data = await res.json()
       router.push(`/tasks/${data.taskId}`)
     } catch {
-      setError('Something went wrong')
+      setError(t('common.somethingWrong'))
     } finally {
       setLoading(false)
     }
@@ -110,43 +112,43 @@ export default function CreateTaskPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-6 text-2xl font-bold">Create a Test</h1>
+      <h1 className="mb-6 text-2xl font-bold">{t('createTask.title')}</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="url">Product URL *</Label>
+          <Label htmlFor="url">{t('createTask.productUrl')}</Label>
           <Input
             id="url"
             value={url}
             onChange={e => setUrl(e.target.value)}
-            placeholder="https://your-product.com"
+            placeholder={t('createTask.urlPlaceholder')}
             required
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="title">Title (optional)</Label>
+          <Label htmlFor="title">{t('createTask.titleLabel')}</Label>
           <Input
             id="title"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            placeholder="Auto-generated from URL if empty"
+            placeholder={t('createTask.titlePlaceholder')}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="focus">Focus area (optional)</Label>
+          <Label htmlFor="focus">{t('createTask.focusLabel')}</Label>
           <Textarea
             id="focus"
             value={focus}
             onChange={e => setFocus(e.target.value)}
-            placeholder="e.g. Test the checkout flow and payment experience"
+            placeholder={t('createTask.focusPlaceholder')}
           />
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="minutes">Est. minutes</Label>
+            <Label htmlFor="minutes">{t('createTask.estMinutes')}</Label>
             <Input
               id="minutes"
               type="number"
@@ -157,7 +159,7 @@ export default function CreateTaskPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="reward">Credits/tester</Label>
+            <Label htmlFor="reward">{t('createTask.creditsPerTester')}</Label>
             <Input
               id="reward"
               type="number"
@@ -168,7 +170,7 @@ export default function CreateTaskPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="testers">Max testers</Label>
+            <Label htmlFor="testers">{t('createTask.maxTesters')}</Label>
             <Input
               id="testers"
               type="number"
@@ -182,20 +184,20 @@ export default function CreateTaskPage() {
 
         <div className="flex items-center gap-4">
           <Button type="button" variant="outline" onClick={handlePreview} disabled={!url || previewLoading}>
-            {previewLoading ? 'Generating...' : 'Preview Test Plan'}
+            {previewLoading ? t('createTask.generating') : t('createTask.previewPlan')}
           </Button>
-          <span className="text-sm text-muted-foreground">AI will generate test steps from your URL</span>
+          <span className="text-sm text-muted-foreground">{t('createTask.aiGenerate')}</span>
         </div>
 
         {steps.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Test Steps (editable)</CardTitle>
+              <CardTitle className="text-lg">{t('createTask.testSteps')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {steps.map((step, i) => (
                 <div key={step.id} className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Step {i + 1}</Label>
+                  <Label className="text-xs text-muted-foreground">{t('createTask.stepN', { n: i + 1 })}</Label>
                   <Input
                     value={step.instruction}
                     onChange={e => updateStep(i, e.target.value)}
@@ -209,11 +211,11 @@ export default function CreateTaskPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
-              <span>Total cost: <strong>{totalCost} credits</strong></span>
+              <span>{t('createTask.totalCost')} <strong>{totalCost} credits</strong></span>
               <span className="text-sm text-muted-foreground">
-                Your balance: {credits} credits
+                {t('createTask.yourBalance', { count: credits })}
                 {credits < totalCost && (
-                  <span className="ml-2 text-red-500">(insufficient)</span>
+                  <span className="ml-2 text-red-500">{t('createTask.insufficient')}</span>
                 )}
               </span>
             </div>
@@ -223,7 +225,7 @@ export default function CreateTaskPage() {
         {error && <p className="text-sm text-red-500">{error}</p>}
 
         <Button type="submit" className="w-full" disabled={loading || credits < totalCost}>
-          {loading ? 'Creating...' : 'Launch Test'}
+          {loading ? t('createTask.creating') : t('createTask.launchTest')}
         </Button>
       </form>
     </div>

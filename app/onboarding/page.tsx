@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useTranslation } from '@/lib/i18n'
 
 export default function OnboardingPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const { t } = useTranslation()
 
   if (!session) {
     router.push('/login')
@@ -18,46 +20,46 @@ export default function OnboardingPage() {
   return (
     <div className="flex min-h-[80vh] flex-col items-center justify-center gap-8 px-4">
       <div className="text-center">
-        <h1 className="text-3xl font-bold">Welcome to human_test()</h1>
+        <h1 className="text-3xl font-bold">{t('onboarding.welcome')}</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          You have 100 credits — enough to launch a 5-person test, or earn more by testing others&apos; products first.
+          {t('onboarding.welcomeDesc')}
         </p>
       </div>
 
       <div className="grid w-full max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2">
         <Card className="cursor-pointer transition-shadow hover:shadow-lg" onClick={() => router.push('/tasks')}>
           <CardHeader>
-            <CardTitle>Test a product first</CardTitle>
-            <CardDescription>Browse available tests and earn credits</CardDescription>
+            <CardTitle>{t('onboarding.testFirst')}</CardTitle>
+            <CardDescription>{t('onboarding.testFirstSub')}</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Complete testing tasks from other developers and earn credits for each test you complete.
+              {t('onboarding.testFirstDesc')}
             </p>
             <Button className="mt-4 w-full" variant="outline">
-              Browse Tests
+              {t('onboarding.browseTests')}
             </Button>
           </CardContent>
         </Card>
 
         <Card className="cursor-pointer transition-shadow hover:shadow-lg" onClick={() => router.push('/tasks/create')}>
           <CardHeader>
-            <CardTitle>Launch my own test</CardTitle>
-            <CardDescription>Get real human feedback on your product</CardDescription>
+            <CardTitle>{t('onboarding.launchOwn')}</CardTitle>
+            <CardDescription>{t('onboarding.launchOwnSub')}</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Create a testing task and get structured feedback from real users. Costs credits per tester.
+              {t('onboarding.launchOwnDesc')}
             </p>
             <Button className="mt-4 w-full">
-              Create Test
+              {t('onboarding.createTest')}
             </Button>
           </CardContent>
         </Card>
       </div>
 
       <Link href="/tasks" className="text-sm text-muted-foreground underline">
-        Skip for now
+        {t('onboarding.skip')}
       </Link>
     </div>
   )

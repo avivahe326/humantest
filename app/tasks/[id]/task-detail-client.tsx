@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { useTranslation } from '@/lib/i18n'
 
 interface FeedbackData {
   id: string
@@ -85,7 +86,6 @@ function SyncedVideoAudio({ videoSrc, audioSrc }: { videoSrc: string; audioSrc: 
     const audio = audioRef.current
     if (!video || !audio) return
 
-    // Fix webm missing duration: seek to a huge time to force browser to calculate it
     const fixDuration = () => {
       if (video.duration === Infinity || isNaN(video.duration)) {
         video.currentTime = 1e10
@@ -162,13 +162,13 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const [expandedFeedbacks, setExpandedFeedbacks] = useState<Set<string>>(new Set())
   const startTimeRef = useRef<number | null>(null)
   const animFrameRef = useRef<number>(0)
+  const { t } = useTranslation()
 
   let hostname = ''
   try { hostname = new URL(task.targetUrl).hostname } catch {}
 
   const isGenerating = reportStatus === 'GENERATING'
 
-  // Simulated progress: 90 * (1 - e^(-t/120)) — slower curve for media analysis
   const updateProgress = useCallback(() => {
     if (!startTimeRef.current) return
     const elapsed = (Date.now() - startTimeRef.current) / 1000
@@ -177,10 +177,8 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
     animFrameRef.current = requestAnimationFrame(updateProgress)
   }, [])
 
-  // Start/stop progress animation
   useEffect(() => {
     if (isGenerating) {
-      // If startTime not set yet, use now (will be corrected by first poll)
       if (!startTimeRef.current) {
         startTimeRef.current = Date.now()
       }
@@ -192,18 +190,15 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
     return () => cancelAnimationFrame(animFrameRef.current)
   }, [isGenerating, updateProgress])
 
-  // Poll report status with per-feedback info
   useEffect(() => {
     if (!isGenerating) return
 
-    // Immediately fetch to get server updatedAt for accurate progress
     const fetchStatus = async () => {
       try {
         const res = await fetch(`/api/tasks/${task.id}/report-status`)
         if (!res.ok) return
         const data = await res.json()
 
-        // Use server updatedAt to set accurate start time
         if (data.updatedAt && data.reportStatus === 'GENERATING') {
           startTimeRef.current = new Date(data.updatedAt).getTime()
         }
@@ -248,14 +243,14 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       }
       router.refresh()
     } catch {
-      setError('Something went wrong')
+      setError(t('common.somethingWrong'))
     } finally {
       setClaiming(false)
     }
   }
 
   async function handleCancel() {
-    if (!confirm('Are you sure you want to cancel this task? Credits for unclaimed slots will be refunded.')) return
+    if (!confirm(t('taskDetail.cancelConfirm'))) return
     setCancelling(true)
     setError('')
     try {
@@ -267,7 +262,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       }
       router.refresh()
     } catch {
-      setError('Something went wrong')
+      setError(t('common.somethingWrong'))
     } finally {
       setCancelling(false)
     }
@@ -289,7 +284,6 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       const data = await res.json()
       if (!res.ok) {
         if (res.status === 409) {
-          // Already generating — just start polling
           setReportStatus('GENERATING')
         } else {
           setError(data.error || 'Failed to generate report')
@@ -298,13 +292,12 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       }
       setReportStatus('GENERATING')
     } catch {
-      setError('Something went wrong')
+      setError(t('common.somethingWrong'))
     } finally {
       setGeneratingReport(false)
     }
   }
 
-  // Compute analysis progress from feedback statuses
   const analysisCompleted = feedbackStatuses.filter(f => f.mediaAnalysisStatus === 'COMPLETED' || f.mediaAnalysisStatus === 'FAILED').length
   const analysisTotal = feedbackStatuses.length
   const allAnalysesDone = analysisTotal > 0 && analysisCompleted === analysisTotal
@@ -319,17 +312,17 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Badge variant="secondary">{task.rewardPerTester} credits</Badge>
-        <Badge variant="outline">~{task.estimatedMinutes} min</Badge>
+        <Badge variant="secondary">{t('tasks.credits', { count: task.rewardPerTester })}</Badge>
+        <Badge variant="outline">{t('tasks.estMinutes', { count: task.estimatedMinutes })}</Badge>
         <Badge variant={task.spotsRemaining > 0 ? 'default' : 'destructive'}>
-          {task.spotsRemaining > 0 ? `${task.spotsRemaining}/${task.maxTesters} spots left` : 'Full'}
+          {task.spotsRemaining > 0 ? t('taskDetail.spotsLeft', { remaining: task.spotsRemaining, max: task.maxTesters }) : t('tasks.full')}
         </Badge>
         <Badge>{task.status}</Badge>
       </div>
 
       {isLoggedIn && (
         <p className="text-sm">
-          <strong>URL:</strong>{' '}
+          <strong>{t('taskDetail.url')}</strong>{' '}
           <a href={task.targetUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
             {task.targetUrl}
           </a>
@@ -338,14 +331,14 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
       {task.description && (
         <Card>
-          <CardHeader><CardTitle className="text-lg">Description</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">{t('taskDetail.description')}</CardTitle></CardHeader>
           <CardContent><p className="text-sm">{task.description}</p></CardContent>
         </Card>
       )}
 
       {task.focus && (
         <Card>
-          <CardHeader><CardTitle className="text-lg">Focus Area</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">{t('taskDetail.focusArea')}</CardTitle></CardHeader>
           <CardContent><p className="text-sm">{task.focus}</p></CardContent>
         </Card>
       )}
@@ -356,41 +349,41 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       <div className="flex gap-3">
         {!isLoggedIn && (
           <Link href="/login">
-            <Button>Log in to claim</Button>
+            <Button>{t('taskDetail.logInToClaim')}</Button>
           </Link>
         )}
 
         {isLoggedIn && !userClaim && task.spotsRemaining > 0 && task.status !== 'COMPLETED' && task.status !== 'CANCELLED' && (
           <Button onClick={handleClaim} disabled={claiming}>
-            {claiming ? 'Claiming...' : 'Claim This Task'}
+            {claiming ? t('taskDetail.claiming') : t('taskDetail.claimTask')}
           </Button>
         )}
 
         {userClaim?.status === 'IN_PROGRESS' && (
           <div className="flex gap-2">
             <Link href={`/tasks/${task.id}/test`}>
-              <Button>Start Testing</Button>
+              <Button>{t('taskDetail.startTesting')}</Button>
             </Link>
             <Link href={`/tasks/${task.id}/submit`}>
-              <Button variant="outline">Submit Feedback Directly</Button>
+              <Button variant="outline">{t('taskDetail.submitDirectly')}</Button>
             </Link>
           </div>
         )}
 
         {userClaim?.status === 'SUBMITTED' && (
-          <Badge variant="secondary" className="text-base px-4 py-2">Feedback Submitted</Badge>
+          <Badge variant="secondary" className="text-base px-4 py-2">{t('taskDetail.feedbackSubmitted')}</Badge>
         )}
 
         {isCreator && task.status !== 'CANCELLED' && (
           <>
             {task.submittedCount >= 1 && !report && !isGenerating && reportStatus !== 'GENERATING' && (
               <Button onClick={() => handleGenerateReport()} disabled={generatingReport} variant="secondary">
-                {generatingReport ? 'Starting...' : 'Generate Report Now'}
+                {generatingReport ? t('taskDetail.starting') : t('taskDetail.generateReport')}
               </Button>
             )}
             {(task.status === 'OPEN' || task.status === 'IN_PROGRESS') && (
               <Button onClick={handleCancel} disabled={cancelling} variant="destructive">
-                {cancelling ? 'Cancelling...' : 'Cancel Task'}
+                {cancelling ? t('taskDetail.cancelling') : t('taskDetail.cancelTask')}
               </Button>
             )}
           </>
@@ -403,15 +396,15 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <p className="text-2xl font-bold">{task.claimedCount}</p>
-              <p className="text-xs text-muted-foreground">Claimed</p>
+              <p className="text-xs text-muted-foreground">{t('taskDetail.claimed')}</p>
             </div>
             <div>
               <p className="text-2xl font-bold">{task.submittedCount}</p>
-              <p className="text-xs text-muted-foreground">Submitted</p>
+              <p className="text-xs text-muted-foreground">{t('taskDetail.submitted')}</p>
             </div>
             <div>
               <p className="text-2xl font-bold">{task.maxTesters}</p>
-              <p className="text-xs text-muted-foreground">Max Testers</p>
+              <p className="text-xs text-muted-foreground">{t('taskDetail.maxTesters')}</p>
             </div>
           </div>
         </CardContent>
@@ -421,26 +414,25 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       {showTabs && (
         <Tabs defaultValue="report" className="w-full">
           <TabsList className="w-full">
-            <TabsTrigger value="report" className="flex-1">Test Report</TabsTrigger>
+            <TabsTrigger value="report" className="flex-1">{t('taskDetail.testReport')}</TabsTrigger>
             {isCreator && initialFeedbacks.length > 0 && (
               <TabsTrigger value="submissions" className="flex-1">
-                Submissions ({initialFeedbacks.length})
+                {t('taskDetail.submissions', { count: initialFeedbacks.length })}
               </TabsTrigger>
             )}
           </TabsList>
 
           <TabsContent value="report" className="space-y-4 mt-4">
-            {/* Report generation progress */}
             {isGenerating && !report && (
               <Card>
                 <CardContent className="pt-6 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">
                       {allAnalysesDone
-                        ? 'Phase 2: Generating aggregate report...'
+                        ? t('taskDetail.phase2')
                         : analysisTotal > 0
-                          ? `Phase 1: Analyzing recordings (${analysisCompleted}/${analysisTotal})...`
-                          : 'Generating AI Report...'
+                          ? t('taskDetail.phase1', { completed: analysisCompleted, total: analysisTotal })
+                          : t('taskDetail.generatingReport')
                       }
                     </p>
                     <span className="text-sm text-muted-foreground">{progress}%</span>
@@ -461,42 +453,40 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                           )}
                           <span className="text-muted-foreground">{fb.testerName}</span>
                           <span className="text-muted-foreground">
-                            {fb.mediaAnalysisStatus === 'COMPLETED' ? '— analysis complete'
-                              : fb.mediaAnalysisStatus === 'FAILED' ? '— analysis failed'
-                              : fb.mediaAnalysisStatus === 'GENERATING' ? '— analyzing...'
-                              : '— pending'}
+                            {fb.mediaAnalysisStatus === 'COMPLETED' ? t('taskDetail.analysisComplete')
+                              : fb.mediaAnalysisStatus === 'FAILED' ? t('taskDetail.analysisFailed')
+                              : fb.mediaAnalysisStatus === 'GENERATING' ? t('taskDetail.analyzing')
+                              : t('taskDetail.pending')}
                           </span>
                         </div>
                       ))}
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Video analysis may take several minutes. You can leave this page and come back.
+                    {t('taskDetail.videoAnalysisNote')}
                   </p>
                 </CardContent>
               </Card>
             )}
 
-            {/* Report generation failed */}
             {reportStatus === 'FAILED' && !report && (
               <Card className="border-red-500/50">
                 <CardContent className="pt-6 space-y-3">
-                  <p className="text-sm text-red-500">Report generation failed. Please try again.</p>
+                  <p className="text-sm text-red-500">{t('taskDetail.reportFailed')}</p>
                   {isCreator && (
                     <Button onClick={() => handleGenerateReport()} disabled={generatingReport} variant="secondary" size="sm">
-                      {generatingReport ? 'Starting...' : 'Retry Report Generation'}
+                      {generatingReport ? t('taskDetail.starting') : t('taskDetail.retryReport')}
                     </Button>
                   )}
                 </CardContent>
               </Card>
             )}
 
-            {/* Report display */}
             {report && (
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Test Report</CardTitle>
+                    <CardTitle className="text-lg">{t('taskDetail.testReport')}</CardTitle>
                     {isCreator && !isGenerating && (
                       <Button
                         variant="outline"
@@ -504,7 +494,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                         onClick={() => handleGenerateReport(true)}
                         disabled={generatingReport}
                       >
-                        {generatingReport ? 'Regenerating...' : 'Regenerate Report'}
+                        {generatingReport ? t('taskDetail.regenerating') : t('taskDetail.regenerateReport')}
                       </Button>
                     )}
                   </div>
@@ -518,7 +508,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
             )}
 
             {!report && !isGenerating && !generatingReport && reportStatus !== 'FAILED' && (
-              <p className="text-sm text-muted-foreground text-center py-8">No report generated yet.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('taskDetail.noReport')}</p>
             )}
           </TabsContent>
 
@@ -541,12 +531,12 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                             <div className="flex items-center gap-2">
                               {raw?.nps !== undefined && (
                                 <Badge variant={raw.nps >= 8 ? 'default' : raw.nps >= 5 ? 'secondary' : 'destructive'}>
-                                  NPS: {raw.nps}/10
+                                  {t('taskDetail.nps', { score: raw.nps })}
                                 </Badge>
                               )}
                               {(fb.screenRecUrl || fb.audioUrl) && (
                                 <Badge variant="outline" className="text-xs">
-                                  {fb.screenRecUrl && fb.audioUrl ? 'Video + Audio' : fb.screenRecUrl ? 'Video' : 'Audio'}
+                                  {fb.screenRecUrl && fb.audioUrl ? t('taskDetail.videoAudio') : fb.screenRecUrl ? t('taskDetail.video') : t('taskDetail.audio')}
                                 </Badge>
                               )}
                               <span className="text-xs text-muted-foreground">
@@ -559,67 +549,64 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
                       <CollapsibleContent>
                         <CardContent className="space-y-4 pt-0">
-                          {/* Media player — video with synced audio overlay */}
                           {fb.screenRecUrl && fb.audioUrl ? (
                             <div>
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Screen Recording + Audio</p>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">{t('taskDetail.screenRecordingAudio')}</p>
                               <SyncedVideoAudio videoSrc={fb.screenRecUrl} audioSrc={fb.audioUrl} />
                             </div>
                           ) : fb.screenRecUrl ? (
                             <div>
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Screen Recording</p>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">{t('taskDetail.screenRecording')}</p>
                               <FixedVideo src={fb.screenRecUrl} className="w-full rounded-lg border" />
                             </div>
                           ) : fb.audioUrl ? (
                             <div>
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Audio Feedback</p>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">{t('taskDetail.audioFeedback')}</p>
                               <audio controls preload="metadata" className="w-full" src={fb.audioUrl} />
                             </div>
                           ) : null}
 
-                          {/* Text feedback */}
                           <div className="space-y-2">
                             {raw?.firstImpression && (
                               <div>
-                                <p className="text-xs font-medium text-muted-foreground">First Impression</p>
+                                <p className="text-xs font-medium text-muted-foreground">{t('taskDetail.firstImpression')}</p>
                                 <p className="text-sm">{raw.firstImpression}</p>
                               </div>
                             )}
                             {raw?.best && (
                               <div>
-                                <p className="text-xs font-medium text-muted-foreground">Best Part</p>
+                                <p className="text-xs font-medium text-muted-foreground">{t('taskDetail.bestPart')}</p>
                                 <p className="text-sm">{raw.best}</p>
                               </div>
                             )}
                             {raw?.worst && (
                               <div>
-                                <p className="text-xs font-medium text-muted-foreground">Worst Part</p>
+                                <p className="text-xs font-medium text-muted-foreground">{t('taskDetail.worstPart')}</p>
                                 <p className="text-sm">{raw.worst}</p>
                               </div>
                             )}
                             {raw?.steps && raw.steps.length > 0 && (
                               <div>
-                                <p className="text-xs font-medium text-muted-foreground">Task Steps</p>
+                                <p className="text-xs font-medium text-muted-foreground">{t('taskDetail.taskSteps')}</p>
                                 {raw.steps.map(s => (
-                                  <p key={s.id} className="text-sm">Step {s.id}: {s.answer}</p>
+                                  <p key={s.id} className="text-sm">{t('taskDetail.stepAnswer', { id: s.id, answer: s.answer })}</p>
                                 ))}
                               </div>
                             )}
                             {fb.textFeedback && (
                               <div>
-                                <p className="text-xs font-medium text-muted-foreground">Additional Feedback</p>
+                                <p className="text-xs font-medium text-muted-foreground">{t('taskDetail.additionalFeedback')}</p>
                                 <p className="text-sm">{fb.textFeedback}</p>
                               </div>
                             )}
                           </div>
 
-                          {/* AI media analysis */}
                           <div className="border-t pt-3">
-                            <p className="text-xs font-medium text-muted-foreground mb-2">AI Video Analysis</p>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">{t('taskDetail.aiVideoAnalysis')}</p>
                             {fb.mediaAnalysisStatus === 'GENERATING' ? (
                               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <span className="animate-pulse">&#9679;</span>
-                                Analyzing video and audio...
+                                {t('taskDetail.analyzingVideoAudio')}
                               </div>
                             ) : fb.mediaAnalysisStatus === 'COMPLETED' && fb.mediaAnalysis ? (
                               <div className="prose prose-invert prose-sm max-w-none">
@@ -628,11 +615,11 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                                 </ReactMarkdown>
                               </div>
                             ) : fb.mediaAnalysisStatus === 'FAILED' ? (
-                              <p className="text-sm text-red-500">Media analysis failed for this tester.</p>
+                              <p className="text-sm text-red-500">{t('taskDetail.mediaAnalysisFailed')}</p>
                             ) : !fb.screenRecUrl && !fb.audioUrl ? (
-                              <p className="text-sm text-muted-foreground">No recording submitted</p>
+                              <p className="text-sm text-muted-foreground">{t('taskDetail.noRecording')}</p>
                             ) : (
-                              <p className="text-sm text-muted-foreground">Analysis not yet started</p>
+                              <p className="text-sm text-muted-foreground">{t('taskDetail.analysisNotStarted')}</p>
                             )}
                           </div>
                         </CardContent>

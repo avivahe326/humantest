@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { Monitor, Mic, Square, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n'
 
 interface TestStep {
   id: string
@@ -29,6 +30,7 @@ export default function IntegratedTestPage() {
   const router = useRouter()
   const params = useParams()
   const taskId = params.id as string
+  const { t } = useTranslation()
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [task, setTask] = useState<TaskInfo | null>(null)
@@ -40,14 +42,12 @@ export default function IntegratedTestPage() {
     maxDurationMs: 15 * 60 * 1000,
   })
 
-  // Auth guard
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
       router.push('/login')
     }
   }, [authStatus, router])
 
-  // Load task info + claim validation
   useEffect(() => {
     if (!session) return
 
@@ -55,12 +55,9 @@ export default function IntegratedTestPage() {
 
     async function load() {
       try {
-        // Check if there was a recording session in progress (tab was discarded)
         const wasRecording = sessionStorage.getItem(`recording-active-${taskId}`)
         console.log('[Test] wasRecording flag:', wasRecording)
         if (wasRecording) {
-          // Don't remove the flag yet — user might choose to continue testing
-          // Check if upload already completed (URLs saved to claim in DB)
           try {
             const claimRes = await fetch(`/api/tasks/${taskId}/my-claim`)
             if (claimRes.ok) {
@@ -76,10 +73,8 @@ export default function IntegratedTestPage() {
           } catch (e) {
             console.error('[Test] Failed to fetch claim:', e)
           }
-          // Show recovery choice UI
           console.log('[Test] Showing recovery UI')
           if (!cancelled) {
-            // Load task info so we can show the target URL
             try {
               const infoRes = await fetch(`/api/tasks/${taskId}/info`)
               if (infoRes.ok) {
@@ -107,7 +102,6 @@ export default function IntegratedTestPage() {
         if (claimRes.ok) {
           const claimData = await claimRes.json()
           if (!cancelled) setClaimId(claimData.claimId)
-          // Check if there's already a recording from a previous session
           if (claimData.screenRecUrl || claimData.audioUrl) {
             if (!cancelled) setPhase('has-recording')
             return
@@ -133,7 +127,6 @@ export default function IntegratedTestPage() {
     return () => { cancelled = true }
   }, [session, taskId, router])
 
-  // Navigation protection during recording
   useEffect(() => {
     if (phase !== 'recording') return
     const handler = (e: BeforeUnloadEvent) => {
@@ -143,7 +136,6 @@ export default function IntegratedTestPage() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [phase])
 
-  // Watch recorder status transitions
   useEffect(() => {
     if (recorder.status === 'recording' && phase !== 'recording') {
       setPhase('recording')
@@ -176,7 +168,7 @@ export default function IntegratedTestPage() {
     try {
       await recorder.uploadRecordings(taskId, claimId)
     } catch {
-      // Error handled in hook - phase stays at 'uploading', recorder.error = 'upload-failed'
+      // Error handled in hook
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, claimId])
@@ -189,7 +181,6 @@ export default function IntegratedTestPage() {
       audioUrl: recorder.audioUrl,
     }
     console.log('[Recording] Saving URLs:', urls)
-    // Save to both sessionStorage and localStorage for reliability
     try {
       sessionStorage.setItem(`recording-urls-${taskId}`, JSON.stringify(urls))
       console.log('[Recording] Saved to sessionStorage')
@@ -212,11 +203,11 @@ export default function IntegratedTestPage() {
   }, [taskId, router, recorder.screenRecUrl, recorder.audioUrl])
 
   const handleSkipUpload = useCallback(() => {
-    if (window.confirm('录制将不会被保存，确定跳过？')) {
+    if (window.confirm(t('test.skipUploadConfirm'))) {
       try { sessionStorage.removeItem(`recording-active-${taskId}`) } catch {}
       router.push(`/tasks/${taskId}/submit`)
     }
-  }, [router, taskId])
+  }, [router, taskId, t])
 
   const remainingMs = 15 * 60 * 1000 - recorder.duration
   const remainingMin = Math.floor(remainingMs / 60000)
@@ -225,26 +216,25 @@ export default function IntegratedTestPage() {
   const ss = String(durationSec % 60).padStart(2, '0')
 
   if (authStatus === 'loading' || phase === 'loading') {
-    return <div className="py-12 text-center">Loading...</div>
+    return <div className="py-12 text-center">{t('test.loading')}</div>
   }
 
   if (phase === 'error') {
     return (
       <div className="mx-auto max-w-lg py-12 text-center space-y-4">
         <h1 className="text-xl font-bold text-red-500">{errorMsg}</h1>
-        <Button onClick={() => router.push(`/tasks/${taskId}`)}>Back to Task</Button>
+        <Button onClick={() => router.push(`/tasks/${taskId}`)}>{t('test.backToTask')}</Button>
       </div>
     )
   }
 
-  // Phase: Has existing recording — ask user what to do
+  // Phase: Has existing recording
   if (phase === 'has-recording' && task) {
     const handleUseExisting = () => {
       router.push(`/tasks/${taskId}/submit`)
     }
 
     const handleReRecord = async () => {
-      // Clear existing recording URLs from claim
       try {
         await fetch(`/api/tasks/${taskId}/my-claim`, {
           method: 'PATCH',
@@ -258,16 +248,16 @@ export default function IntegratedTestPage() {
     return (
       <div className="mx-auto max-w-md py-12 space-y-6 text-center">
         <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
-        <h2 className="text-lg font-bold">You already have a recording</h2>
+        <h2 className="text-lg font-bold">{t('test.hasRecording')}</h2>
         <p className="text-sm text-muted-foreground">
-          A screen recording from a previous session was found. Would you like to use it or record a new one?
+          {t('test.hasRecordingDesc')}
         </p>
         <div className="flex flex-col gap-3">
           <Button onClick={handleUseExisting}>
-            Use existing recording & submit
+            {t('test.useExisting')}
           </Button>
           <Button variant="outline" onClick={handleReRecord}>
-            Record a new one
+            {t('test.recordNew')}
           </Button>
         </div>
       </div>
@@ -284,46 +274,46 @@ export default function IntegratedTestPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              Target website: <a href={task.targetUrl} target="_blank" rel="noopener noreferrer" className="underline text-primary">{task.targetUrl}</a>
+              {t('test.targetWebsite')} <a href={task.targetUrl} target="_blank" rel="noopener noreferrer" className="underline text-primary">{task.targetUrl}</a>
             </p>
 
             <div className="rounded-lg border p-4 space-y-3">
-              <p className="text-sm font-medium">The following permissions will be requested to record your testing session:</p>
+              <p className="text-sm font-medium">{t('test.permissionsIntro')}</p>
               <div className="flex items-center gap-3 text-sm">
                 <Monitor className="h-5 w-5 text-muted-foreground" />
-                <span>Screen Recording</span>
+                <span>{t('test.screenRecording')}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Mic className="h-5 w-5 text-muted-foreground" />
-                <span>Microphone</span>
+                <span>{t('test.microphone')}</span>
               </div>
-              <p className="text-xs text-muted-foreground">On macOS, you may need to grant Screen Recording and Microphone permissions in System Settings. Chrome may require a restart after granting.</p>
+              <p className="text-xs text-muted-foreground">{t('test.macPermissions')}</p>
             </div>
 
             <div className="rounded-lg bg-muted/50 p-4 space-y-2">
-              <p className="text-sm font-medium">How it works:</p>
+              <p className="text-sm font-medium">{t('test.howItWorks')}</p>
               <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                <li>Click &quot;Start Testing&quot; below</li>
-                <li>Allow screen recording when prompted</li>
-                <li>The target website will open in a new tab</li>
-                <li>Complete the test steps in the new tab</li>
-                <li>Return here to stop recording when done</li>
+                <li>{t('test.howStep1')}</li>
+                <li>{t('test.howStep2')}</li>
+                <li>{t('test.howStep3')}</li>
+                <li>{t('test.howStep4')}</li>
+                <li>{t('test.howStep5')}</li>
               </ol>
             </div>
 
             {recorder.error === 'permission-denied' && (
-              <p className="text-sm text-red-500">Permission denied. Please allow screen recording and microphone access, or skip recording.</p>
+              <p className="text-sm text-red-500">{t('test.permissionDenied')}</p>
             )}
             {recorder.error === 'no-device' && (
-              <p className="text-sm text-red-500">No recording device found. Please check your microphone settings.</p>
+              <p className="text-sm text-red-500">{t('test.noDevice')}</p>
             )}
 
             <div className="flex gap-3">
               <Button onClick={handleStartRecording} className="flex-1">
-                Start Testing
+                {t('test.startTesting')}
               </Button>
               <Button variant="outline" onClick={() => router.push(`/tasks/${taskId}/submit`)}>
-                Skip Recording
+                {t('test.skipRecording')}
               </Button>
             </div>
           </CardContent>
@@ -338,28 +328,25 @@ export default function IntegratedTestPage() {
       <div className="mx-auto max-w-lg py-12 space-y-6">
         <Card>
           <CardContent className="pt-6 space-y-6">
-            {/* Recording indicator */}
             <div className="flex items-center justify-center gap-3">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
               </span>
               <span className="font-mono text-2xl font-bold">{mm}:{ss}</span>
-              <Badge variant="destructive" className="text-xs">REC</Badge>
+              <Badge variant="destructive" className="text-xs">{t('test.rec')}</Badge>
             </div>
 
-            {/* Time warning */}
             {remainingMin < 2 && (
               <div className="flex items-center justify-center gap-2 text-yellow-500 text-sm">
                 <AlertTriangle className="h-4 w-4" />
-                <span>Less than {remainingMin > 0 ? `${remainingMin} min` : '1 min'} remaining. Recording will stop automatically.</span>
+                <span>{t('test.timeWarning', { min: remainingMin > 0 ? `${remainingMin} min` : '1 min' })}</span>
               </div>
             )}
 
-            {/* Target website link */}
             <div className="rounded-lg border p-4 text-center space-y-3">
               <Monitor className="h-10 w-10 text-muted-foreground mx-auto" />
-              <p className="text-sm text-muted-foreground">Target website is open in a new tab. Complete the test steps there.</p>
+              <p className="text-sm text-muted-foreground">{t('test.targetOpen')}</p>
               <a
                 href={task.targetUrl}
                 target="_blank"
@@ -367,14 +354,13 @@ export default function IntegratedTestPage() {
                 className="inline-flex items-center gap-1 text-sm text-primary underline"
               >
                 <ExternalLink className="h-3 w-3" />
-                Open target website
+                {t('test.openTarget')}
               </a>
             </div>
 
-            {/* Test steps */}
             {task.requirements?.steps && task.requirements.steps.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-medium">Test Steps</p>
+                <p className="text-sm font-medium">{t('test.testSteps')}</p>
                 <div className="space-y-1">
                   {task.requirements.steps.map((s: TestStep, i: number) => (
                     <div key={s.id} className="text-sm text-muted-foreground">
@@ -385,7 +371,6 @@ export default function IntegratedTestPage() {
               </div>
             )}
 
-            {/* Stop button */}
             <Button
               variant="destructive"
               onClick={handleStopRecording}
@@ -393,7 +378,7 @@ export default function IntegratedTestPage() {
               size="lg"
             >
               <Square className="h-4 w-4 mr-2" />
-              Stop Recording
+              {t('test.stopRecording')}
             </Button>
           </CardContent>
         </Card>
@@ -405,20 +390,19 @@ export default function IntegratedTestPage() {
   if (phase === 'uploading') {
     return (
       <div className="mx-auto max-w-md py-12 space-y-6 text-center">
-        <h2 className="text-lg font-bold">Saving recording...</h2>
+        <h2 className="text-lg font-bold">{t('test.savingRecording')}</h2>
         <Progress value={recorder.uploadProgress} />
         <p className="text-sm text-muted-foreground">{recorder.uploadProgress}%</p>
         {recorder.error === 'upload-failed' && (
           <div className="space-y-2">
-            <p className="text-sm text-red-500">Upload failed. Please try again.</p>
+            <p className="text-sm text-red-500">{t('test.uploadFailed')}</p>
             <div className="flex gap-2 justify-center">
-              <Button onClick={handleUpload}>Retry Upload</Button>
+              <Button onClick={handleUpload}>{t('test.retryUpload')}</Button>
               <Button
                 variant="outline"
-                aria-label="跳过上传，直接提交反馈"
                 onClick={handleSkipUpload}
               >
-                Skip Upload
+                {t('test.skipUpload')}
               </Button>
             </div>
           </div>
@@ -432,19 +416,18 @@ export default function IntegratedTestPage() {
     return (
       <div className="mx-auto max-w-md py-12 space-y-4 text-center">
         <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
-        <h2 className="text-lg font-bold">Recording complete!</h2>
-        <p className="text-sm text-muted-foreground">Redirecting to feedback form...</p>
+        <h2 className="text-lg font-bold">{t('test.recordingComplete')}</h2>
+        <p className="text-sm text-muted-foreground">{t('test.redirecting')}</p>
         <Button variant="link" onClick={() => router.push(`/tasks/${taskId}/submit`)}>
-          如果没有自动跳转，点击这里
+          {t('test.clickHereRedirect')}
         </Button>
       </div>
     )
   }
 
-  // Phase: Recovery — user returned to recording tab after it was discarded
+  // Phase: Recovery
   if (phase === 'recovery') {
     const handleContinueTesting = () => {
-      // Keep recording-active flag, reopen target website
       if (task?.targetUrl) {
         window.open(task.targetUrl, '_blank')
       }
@@ -476,41 +459,40 @@ export default function IntegratedTestPage() {
     return (
       <div className="mx-auto max-w-md py-12 space-y-6 text-center">
         <Monitor className="h-12 w-12 text-primary mx-auto" />
-        <h2 className="text-lg font-bold">Recording in progress</h2>
+        <h2 className="text-lg font-bold">{t('test.recordingInProgress')}</h2>
         <p className="text-sm text-muted-foreground">
-          You have an active recording session. What would you like to do?
+          {t('test.activeSession')}
         </p>
         <div className="flex flex-col gap-3">
           <Button onClick={handleContinueTesting}>
-            Continue testing
+            {t('test.continueTesting')}
           </Button>
           <Button variant="secondary" onClick={handleStopAndUpload}>
-            Stop recording & submit
+            {t('test.stopAndSubmit')}
           </Button>
           <Button variant="outline" onClick={handleSkipRecording}>
-            Discard recording & submit
+            {t('test.discardAndSubmit')}
           </Button>
         </div>
       </div>
     )
   }
 
-  // Phase: Interrupted (tab was discarded, no recoverable data)
+  // Phase: Interrupted
   if (phase === 'interrupted') {
     return (
       <div className="mx-auto max-w-md py-12 space-y-6 text-center">
         <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto" />
-        <h2 className="text-lg font-bold">Recording interrupted</h2>
+        <h2 className="text-lg font-bold">{t('test.recordingInterrupted')}</h2>
         <p className="text-sm text-muted-foreground">
-          Your browser tab was unloaded during recording, so the video/audio data was lost.
-          You can re-record or continue to submit feedback without a recording.
+          {t('test.interruptedDesc')}
         </p>
         <div className="flex gap-3 justify-center">
           <Button onClick={() => setPhase('ready')}>
-            Re-record
+            {t('test.reRecord')}
           </Button>
           <Button variant="outline" onClick={() => router.push(`/tasks/${taskId}/submit`)}>
-            Submit without recording
+            {t('test.submitWithout')}
           </Button>
         </div>
       </div>

@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useTranslation } from '@/lib/i18n'
 
 interface MyTasksClientProps {
   claims: {
@@ -28,23 +29,24 @@ interface MyTasksClientProps {
 export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
   const activeClaims = claims.filter(c => c.status === 'IN_PROGRESS')
   const completedClaims = claims.filter(c => c.status === 'SUBMITTED')
+  const { t } = useTranslation()
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">My Tasks</h1>
+      <h1 className="mb-6 text-2xl font-bold">{t('myTasks.title')}</h1>
 
       <Tabs defaultValue="testing">
         <TabsList>
-          <TabsTrigger value="testing">Testing ({activeClaims.length})</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({completedClaims.length})</TabsTrigger>
-          <TabsTrigger value="created">Created ({createdTasks.length})</TabsTrigger>
+          <TabsTrigger value="testing">{t('myTasks.testing', { count: activeClaims.length })}</TabsTrigger>
+          <TabsTrigger value="completed">{t('myTasks.completed', { count: completedClaims.length })}</TabsTrigger>
+          <TabsTrigger value="created">{t('myTasks.created', { count: createdTasks.length })}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="testing" className="mt-4 space-y-3">
           {activeClaims.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-muted-foreground">No tests in progress.</p>
-              <Link href="/tasks"><Button className="mt-4">Browse available tests</Button></Link>
+              <p className="text-muted-foreground">{t('myTasks.noInProgress')}</p>
+              <Link href="/tasks"><Button className="mt-4">{t('myTasks.browseTests')}</Button></Link>
             </div>
           ) : (
             activeClaims.map(claim => (
@@ -55,14 +57,14 @@ export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
                       {claim.task.title}
                     </Link>
                     <p className="text-xs text-muted-foreground">
-                      Claimed {new Date(claim.claimedAt).toLocaleDateString()}
+                      {t('myTasks.claimedOn', { date: new Date(claim.claimedAt).toLocaleDateString() })}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge>IN_PROGRESS</Badge>
+                    <Badge>{t('myTasks.inProgress')}</Badge>
                     {claim.task.status !== 'COMPLETED' && claim.task.status !== 'CANCELLED' && (
                       <Link href={`/tasks/${claim.task.id}/submit`}>
-                        <Button size="sm">Submit</Button>
+                        <Button size="sm">{t('myTasks.submit')}</Button>
                       </Link>
                     )}
                   </div>
@@ -75,7 +77,7 @@ export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
         <TabsContent value="completed" className="mt-4 space-y-3">
           {completedClaims.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-muted-foreground">No completed tests yet.</p>
+              <p className="text-muted-foreground">{t('myTasks.noCompleted')}</p>
             </div>
           ) : (
             completedClaims.map(claim => (
@@ -86,7 +88,7 @@ export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
                       {claim.task.title}
                     </Link>
                     <p className="text-xs text-muted-foreground">
-                      Claimed {new Date(claim.claimedAt).toLocaleDateString()}
+                      {t('myTasks.claimedOn', { date: new Date(claim.claimedAt).toLocaleDateString() })}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -102,8 +104,8 @@ export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
         <TabsContent value="created" className="mt-4 space-y-3">
           {createdTasks.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-muted-foreground">No tests created yet.</p>
-              <Link href="/tasks/create"><Button className="mt-4">Launch your first test</Button></Link>
+              <p className="text-muted-foreground">{t('myTasks.noCreated')}</p>
+              <Link href="/tasks/create"><Button className="mt-4">{t('myTasks.launchFirst')}</Button></Link>
             </div>
           ) : (
             createdTasks.map(task => (
@@ -114,7 +116,7 @@ export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
                       {task.title}
                     </Link>
                     <p className="text-xs text-muted-foreground">
-                      {task.submittedCount}/{task.maxTesters} submitted
+                      {t('myTasks.submittedOf', { submitted: task.submittedCount, max: task.maxTesters })}
                       {' · '}
                       {new Date(task.createdAt).toLocaleDateString()}
                     </p>
@@ -123,7 +125,7 @@ export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
                     <Badge>{task.status}</Badge>
                     {task.report && (
                       <Link href={`/tasks/${task.id}`}>
-                        <Badge variant="secondary">Report ready</Badge>
+                        <Badge variant="secondary">{t('myTasks.reportReady')}</Badge>
                       </Link>
                     )}
                   </div>

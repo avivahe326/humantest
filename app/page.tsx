@@ -1,11 +1,16 @@
+'use client'
+
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
 import { SampleReport } from './sample-report'
 import { CopyButton } from './copy-button'
+import { useTranslation } from '@/lib/i18n'
 
 export default function LandingPage() {
+  const { t } = useTranslation()
+
   return (
     <div className="space-y-24 pb-16">
       {/* Hero */}
@@ -15,23 +20,23 @@ export default function LandingPage() {
           <span className="font-mono">human_test()</span>
         </h1>
         <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
-          Let AI hire humans to test your product. Get structured feedback from real users in hours, not weeks.
+          {t('landing.heroSubtitle')}
         </p>
         <div className="flex gap-4">
           <Link href="/register">
-            <Button size="lg">Get Started Free</Button>
+            <Button size="lg">{t('landing.getStarted')}</Button>
           </Link>
           <Link href="/tasks">
-            <Button size="lg" variant="outline">Browse Tests</Button>
+            <Button size="lg" variant="outline">{t('landing.browseTests')}</Button>
           </Link>
         </div>
       </section>
 
       {/* Install as Agent Skill */}
       <section className="space-y-6 text-center">
-        <h2 className="text-2xl font-bold">Install as Agent Skill</h2>
+        <h2 className="text-2xl font-bold">{t('landing.installSkill')}</h2>
         <p className="mx-auto max-w-xl text-muted-foreground">
-          Add human testing to any AI coding agent — Claude Code, Cursor, Copilot, Gemini CLI, and 30+ more.
+          {t('landing.installSkillDesc')}
         </p>
         <Card className="mx-auto max-w-lg">
           <CardContent className="pt-6">
@@ -42,41 +47,53 @@ export default function LandingPage() {
           </CardContent>
         </Card>
         <p className="text-xs text-muted-foreground">
-          Powered by <a href="https://skills.sh" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">skills.sh</a> open agent skills ecosystem
+          {t('landing.poweredBy', { link: '' }).split('').length > 0 && (
+            <>
+              {t('landing.poweredBy', { link: '__LINK__' }).split('__LINK__')[0]}
+              <a href="https://skills.sh" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">skills.sh</a>
+              {t('landing.poweredBy', { link: '__LINK__' }).split('__LINK__')[1]}
+            </>
+          )}
         </p>
       </section>
 
       {/* How It Works */}
       <section className="space-y-8">
-        <h2 className="text-center text-2xl font-bold">How It Works</h2>
+        <h2 className="text-center text-2xl font-bold">{t('landing.howItWorks')}</h2>
         <div className="grid gap-6 md:grid-cols-3">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">1. Create a Test</CardTitle>
+              <CardTitle className="text-lg">{t('landing.step1Title')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Call <code className="text-primary">human_test()</code> from your AI agent or use the web form. AI generates a structured test plan automatically.
+                {t('landing.step1Desc', { code: '' }).split('').length > 0 && (
+                  <>
+                    {t('landing.step1Desc', { code: '__CODE__' }).split('__CODE__')[0]}
+                    <code className="text-primary">human_test()</code>
+                    {t('landing.step1Desc', { code: '__CODE__' }).split('__CODE__')[1]}
+                  </>
+                )}
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">2. Humans Test</CardTitle>
+              <CardTitle className="text-lg">{t('landing.step2Title')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Real testers claim your task, use your product, and provide guided feedback with screen recording, audio narration, and NPS rating.
+                {t('landing.step2Desc')}
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">3. Get AI Report</CardTitle>
+              <CardTitle className="text-lg">{t('landing.step3Title')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                AI analyzes recordings and aggregates all feedback into a structured report with findings ranked by severity, NPS analysis, and actionable recommendations.
+                {t('landing.step3Desc')}
               </p>
             </CardContent>
           </Card>
@@ -85,7 +102,7 @@ export default function LandingPage() {
 
       {/* For Developers */}
       <section className="space-y-6">
-        <h2 className="text-center text-2xl font-bold">For Developers</h2>
+        <h2 className="text-center text-2xl font-bold">{t('landing.forDevelopers')}</h2>
         <Card className="mx-auto max-w-2xl">
           <CardContent className="pt-6">
             <pre className="overflow-x-auto rounded bg-muted p-4 text-sm">
@@ -113,20 +130,20 @@ const { taskId } = await response.json();
 
       {/* For Testers */}
       <section className="space-y-6 text-center">
-        <h2 className="text-2xl font-bold">For Testers</h2>
+        <h2 className="text-2xl font-bold">{t('landing.forTesters')}</h2>
         <p className="mx-auto max-w-xl text-muted-foreground">
-          Earn credits by testing real products. Browse available tests, complete guided feedback tasks, and build your testing portfolio.
+          {t('landing.forTestersDesc')}
         </p>
         <Link href="/register">
-          <Button variant="outline" size="lg">Start Testing &amp; Earning</Button>
+          <Button variant="outline" size="lg">{t('landing.startTestingEarning')}</Button>
         </Link>
       </section>
 
       {/* Real Report Demo */}
       <section className="space-y-6">
-        <h2 className="text-center text-2xl font-bold">Real Report Example</h2>
+        <h2 className="text-center text-2xl font-bold">{t('landing.realReportExample')}</h2>
         <p className="text-center text-muted-foreground">
-          This is a real AI-generated report from an actual usability test on our platform:
+          {t('landing.realReportDesc')}
         </p>
         <SampleReport />
       </section>
@@ -134,7 +151,7 @@ const { taskId } = await response.json();
       {/* Footer */}
       <footer className="border-t border-border pt-8 text-center text-sm text-muted-foreground">
         <p className="font-mono">human_test()</p>
-        <p className="mt-1">Real human feedback for AI-built products.</p>
+        <p className="mt-1">{t('landing.footerTagline')}</p>
       </footer>
     </div>
   )

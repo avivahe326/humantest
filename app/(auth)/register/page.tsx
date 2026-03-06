@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useTranslation } from '@/lib/i18n'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   const [sendingCode, setSendingCode] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const { t } = useTranslation()
 
   // Form fields
   const [name, setName] = useState('')
@@ -35,23 +37,23 @@ export default function RegisterPage() {
   const validateForm = useCallback(() => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!name.trim()) {
-      setError('Name is required')
+      setError(t('register.nameRequired'))
       return false
     }
     if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address')
+      setError(t('register.invalidEmail'))
       return false
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+      setError(t('register.passwordLength'))
       return false
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('register.passwordMismatch'))
       return false
     }
     return true
-  }, [name, email, password, confirmPassword])
+  }, [name, email, password, confirmPassword, t])
 
   async function handleSendCode() {
     setError('')
@@ -70,18 +72,18 @@ export default function RegisterPage() {
       if (!res.ok) {
         if (res.status === 429 && data.retryAfter) {
           setCooldown(data.retryAfter)
-          setError(`Please wait ${data.retryAfter}s before requesting another code`)
+          setError(t('register.waitRetry', { seconds: data.retryAfter }))
         } else {
-          setError(data.error || 'Failed to send verification code')
+          setError(data.error || t('register.sendCodeFailed'))
         }
         return
       }
 
       setCodeSent(true)
       setCooldown(60)
-      toast.success('Verification code sent to your email')
+      toast.success(t('register.codeSent'))
     } catch {
-      setError('Something went wrong')
+      setError(t('register.somethingWrong'))
     } finally {
       setSendingCode(false)
     }
@@ -92,7 +94,7 @@ export default function RegisterPage() {
     setError('')
 
     if (!code || code.length !== 6) {
-      setError('Please enter the 6-digit verification code')
+      setError(t('register.enterVerificationCode'))
       return
     }
 
@@ -110,7 +112,7 @@ export default function RegisterPage() {
         return
       }
 
-      toast.success('Account created successfully!')
+      toast.success(t('register.accountCreated'))
 
       const signInRes = await signIn('credentials', {
         email,
@@ -119,13 +121,13 @@ export default function RegisterPage() {
       })
 
       if (signInRes?.error) {
-        setError('Registration succeeded but auto-login failed. Please log in.')
+        setError(t('register.autoLoginFailed'))
         router.push('/login')
       } else {
         router.push('/onboarding')
       }
     } catch {
-      setError('Something went wrong')
+      setError(t('register.somethingWrong'))
     } finally {
       setLoading(false)
     }
@@ -135,17 +137,17 @@ export default function RegisterPage() {
     <div className="flex min-h-[80vh] items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl">Create Account</CardTitle>
+          <CardTitle className="text-2xl">{t('register.title')}</CardTitle>
           <CardDescription>
             {codeSent
-              ? 'Enter the verification code sent to your email'
-              : 'Join human_test() and start testing or creating tests'}
+              ? t('register.subtitleCode')
+              : t('register.subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">{t('register.name')}</Label>
               <Input
                 id="name"
                 value={name}
@@ -155,7 +157,7 @@ export default function RegisterPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('register.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -166,7 +168,7 @@ export default function RegisterPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('register.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -179,7 +181,7 @@ export default function RegisterPage() {
             </div>
             {!codeSent && (
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Label htmlFor="confirmPassword">{t('register.confirmPassword')}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -193,12 +195,12 @@ export default function RegisterPage() {
 
             {codeSent && (
               <div className="space-y-2">
-                <Label htmlFor="code">Verification Code</Label>
+                <Label htmlFor="code">{t('register.verificationCode')}</Label>
                 <Input
                   id="code"
                   inputMode="numeric"
                   maxLength={6}
-                  placeholder="Enter 6-digit code"
+                  placeholder={t('register.enterCode')}
                   value={code}
                   onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   autoFocus
@@ -216,12 +218,12 @@ export default function RegisterPage() {
                 disabled={sendingCode}
                 onClick={handleSendCode}
               >
-                {sendingCode ? 'Sending code...' : 'Send Verification Code'}
+                {sendingCode ? t('register.sendingCode') : t('register.sendCode')}
               </Button>
             ) : (
               <div className="space-y-3">
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Creating account...' : 'Sign Up'}
+                  {loading ? t('register.creatingAccount') : t('register.signUp')}
                 </Button>
                 <div className="flex items-center justify-between text-sm">
                   <button
@@ -233,7 +235,7 @@ export default function RegisterPage() {
                       setError('')
                     }}
                   >
-                    Edit details
+                    {t('register.editDetails')}
                   </button>
                   <button
                     type="button"
@@ -241,16 +243,16 @@ export default function RegisterPage() {
                     disabled={cooldown > 0 || sendingCode}
                     onClick={handleSendCode}
                   >
-                    {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+                    {cooldown > 0 ? t('register.resendIn', { seconds: cooldown }) : t('register.resendCode')}
                   </button>
                 </div>
               </div>
             )}
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
+            {t('register.hasAccount')}{' '}
             <Link href="/login" className="underline hover:text-foreground">
-              Log in
+              {t('register.logIn')}
             </Link>
           </p>
         </CardContent>

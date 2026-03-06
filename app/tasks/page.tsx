@@ -1,8 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { TasksListClient } from './tasks-list-client'
 
 export default async function TasksPage({
   searchParams,
@@ -31,71 +28,22 @@ export default async function TasksPage({
 
   const totalPages = Math.ceil(total / limit)
 
+  const serializedTasks = tasks.map(task => ({
+    id: task.id,
+    title: task.title,
+    targetUrl: task.targetUrl,
+    focus: task.focus,
+    rewardPerTester: task.rewardPerTester,
+    estimatedMinutes: task.estimatedMinutes,
+    maxTesters: task.maxTesters,
+    claimsCount: task._count.claims,
+  }))
+
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Available Tests</h1>
-        <Link href="/tasks/create">
-          <Button>Create Test</Button>
-        </Link>
-      </div>
-
-      {tasks.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">
-          No tests available yet. Be the first to create one!
-        </p>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {tasks.map(task => {
-            const spotsRemaining = task.maxTesters - task._count.claims
-            let hostname = ''
-            try { hostname = new URL(task.targetUrl).hostname } catch {}
-
-            return (
-              <Link key={task.id} href={`/tasks/${task.id}`}>
-                <Card className="transition-shadow hover:shadow-lg h-full">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg leading-tight">{task.title}</CardTitle>
-                    {hostname && (
-                      <p className="text-sm text-muted-foreground">{hostname}</p>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    {task.focus && (
-                      <p className="mb-3 text-sm text-muted-foreground line-clamp-2">{task.focus}</p>
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">{task.rewardPerTester} credits</Badge>
-                      <Badge variant="outline">~{task.estimatedMinutes} min</Badge>
-                      <Badge variant={spotsRemaining > 0 ? 'default' : 'destructive'}>
-                        {spotsRemaining > 0 ? `${spotsRemaining} spots left` : 'Full'}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            )
-          })}
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="mt-8 flex justify-center gap-2">
-          {page > 1 && (
-            <Link href={`/tasks?page=${page - 1}`}>
-              <Button variant="outline" size="sm">Previous</Button>
-            </Link>
-          )}
-          <span className="flex items-center px-3 text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          {page < totalPages && (
-            <Link href={`/tasks?page=${page + 1}`}>
-              <Button variant="outline" size="sm">Next</Button>
-            </Link>
-          )}
-        </div>
-      )}
-    </div>
+    <TasksListClient
+      tasks={serializedTasks}
+      page={page}
+      totalPages={totalPages}
+    />
   )
 }

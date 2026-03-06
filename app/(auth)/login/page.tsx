@@ -8,11 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useTranslation } from '@/lib/i18n'
 
 export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const { t } = useTranslation()
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -32,7 +34,7 @@ export default function LoginPage() {
     setLoading(false)
 
     if (res?.error) {
-      setError('Invalid email or password')
+      setError(t('login.invalidCredentials'))
     } else {
       window.location.href = '/tasks'
     }
@@ -42,28 +44,28 @@ export default function LoginPage() {
     <div className="flex min-h-[80vh] items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl">Log In</CardTitle>
-          <CardDescription>Sign in to your human_test() account</CardDescription>
+          <CardTitle className="text-2xl">{t('login.title')}</CardTitle>
+          <CardDescription>{t('login.subtitle')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('login.email')}</Label>
               <Input id="email" name="email" type="email" required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('login.password')}</Label>
               <Input id="password" name="password" type="password" required />
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Log In'}
+              {loading ? t('login.signingIn') : t('login.logIn')}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{' '}
+            {t('login.noAccount')}{' '}
             <Link href="/register" className="underline hover:text-foreground">
-              Sign up
+              {t('login.signUp')}
             </Link>
           </p>
         </CardContent>

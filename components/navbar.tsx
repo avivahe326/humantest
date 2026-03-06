@@ -6,11 +6,13 @@ import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from '@/lib/i18n'
 
 export function Navbar() {
   const { data: session, status } = useSession()
   const [credits, setCredits] = useState<number | null>(null)
   const pathname = usePathname()
+  const { locale, setLocale, t } = useTranslation()
 
   const fetchCredits = useCallback(() => {
     if (!session?.user?.id) return
@@ -40,18 +42,18 @@ export function Navbar() {
           </Link>
           <div className="hidden items-center gap-4 sm:flex">
             <Link href="/tasks" className="text-sm text-muted-foreground hover:text-foreground">
-              Tasks
+              {t('nav.tasks')}
             </Link>
             {session && (
               <>
                 <Link href="/tasks/create" className="text-sm text-muted-foreground hover:text-foreground">
-                  Create Test
+                  {t('nav.createTest')}
                 </Link>
                 <Link href="/my-tasks" className="text-sm text-muted-foreground hover:text-foreground">
-                  My Tasks
+                  {t('nav.myTasks')}
                 </Link>
                 <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground">
-                  Settings
+                  {t('nav.settings')}
                 </Link>
               </>
             )}
@@ -59,22 +61,28 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setLocale(locale === 'en' ? 'zh' : 'en')}
+            className="text-sm text-muted-foreground hover:text-foreground px-2 py-1 rounded transition-colors"
+          >
+            {t('nav.langSwitch')}
+          </button>
           {status === 'loading' ? null : session ? (
             <>
               {credits !== null && (
-                <span className="text-sm font-medium">{credits} credits</span>
+                <span className="text-sm font-medium">{t('nav.credits', { count: credits })}</span>
               )}
               <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: '/' })}>
-                Log out
+                {t('nav.logOut')}
               </Button>
             </>
           ) : (
             <>
               <Link href="/login">
-                <Button variant="ghost" size="sm">Log in</Button>
+                <Button variant="ghost" size="sm">{t('nav.logIn')}</Button>
               </Link>
               <Link href="/register">
-                <Button size="sm">Sign up</Button>
+                <Button size="sm">{t('nav.signUp')}</Button>
               </Link>
             </>
           )}

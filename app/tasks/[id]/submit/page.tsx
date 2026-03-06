@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress'
 import { Slider } from '@/components/ui/slider'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
+import { useTranslation } from '@/lib/i18n'
 
 interface TestStep {
   id: string
@@ -46,6 +47,7 @@ export default function SubmitFeedbackPage() {
   const router = useRouter()
   const params = useParams()
   const taskId = params.id as string
+  const { t } = useTranslation()
 
   const [step, setStep] = useState(1)
   const [task, setTask] = useState<{
@@ -73,11 +75,10 @@ export default function SubmitFeedbackPage() {
 
   // Load recording URLs from sessionStorage (priority), localStorage, query params, claim API, then draft
   useEffect(() => {
-    // 1. Check sessionStorage (coming from recording page)
     const recordingKey = `recording-urls-${taskId}`
     let fromRecording = false
 
-    const tryLoadRecordingUrls = (storage: Storage, storageName: string) => {
+    const tryLoadRecordingUrls = (storage: Storage) => {
       const data = storage.getItem(recordingKey)
       if (!data) return false
       try {
@@ -90,15 +91,13 @@ export default function SubmitFeedbackPage() {
       } catch { return false }
     }
 
-    // Try sessionStorage first, then localStorage
-    fromRecording = tryLoadRecordingUrls(sessionStorage, 'sessionStorage') || tryLoadRecordingUrls(localStorage, 'localStorage')
+    fromRecording = tryLoadRecordingUrls(sessionStorage) || tryLoadRecordingUrls(localStorage)
     if (fromRecording) {
       try { sessionStorage.removeItem(recordingKey) } catch {}
       try { localStorage.removeItem(recordingKey) } catch {}
       return
     }
 
-    // 1b. Fallback: check URL query params
     const urlParams = new URLSearchParams(window.location.search)
     const qScreen = urlParams.get('screenRecUrl')
     const qAudio = urlParams.get('audioUrl')
@@ -110,7 +109,6 @@ export default function SubmitFeedbackPage() {
       return
     }
 
-    // 1c. Fallback: fetch recording URLs from claim in database
     fetch(`/api/tasks/${taskId}/my-claim`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
@@ -120,7 +118,6 @@ export default function SubmitFeedbackPage() {
           setAutoRecorded(true)
           return
         }
-        // 2. No recording URLs anywhere — restore from localStorage draft
         try {
           const draft = localStorage.getItem(storageKey)
           if (draft) {
@@ -136,7 +133,6 @@ export default function SubmitFeedbackPage() {
         } catch {}
       })
       .catch(() => {
-        // API failed — try draft
         try {
           const draft = localStorage.getItem(storageKey)
           if (draft) {
@@ -171,17 +167,16 @@ export default function SubmitFeedbackPage() {
         setLoading(false)
       })
       .catch(() => {
-        setError('Failed to load task')
+        setError(t('submit.failedToLoad'))
         setLoading(false)
       })
-  }, [taskId])
+  }, [taskId, t])
 
-  if (authStatus === 'loading' || loading) return <div className="py-12 text-center">Loading...</div>
+  if (authStatus === 'loading' || loading) return <div className="py-12 text-center">{t('submit.loading')}</div>
   if (!session) { router.push('/login'); return null }
-  if (!task) return <div className="py-12 text-center text-red-500">{error || 'Task not found'}</div>
+  if (!task) return <div className="py-12 text-center text-red-500">{error || t('submit.taskNotFound')}</div>
 
   const dynamicSteps = task.requirements?.steps ?? []
-  // Step 1 = First Impression, Steps 2..N = dynamic steps, Last step = Summary
   const totalSteps = 1 + dynamicSteps.length + 1
 
   function updateStepAnswer(stepId: string, answer: string) {
@@ -224,7 +219,7 @@ export default function SubmitFeedbackPage() {
       localStorage.removeItem(storageKey)
       setSuccess({ creditsEarned: data.creditsEarned, newBalance: data.newBalance })
     } catch {
-      setError('Something went wrong')
+      setError(t('common.somethingWrong'))
     } finally {
       setSubmitting(false)
     }
@@ -233,12 +228,12 @@ export default function SubmitFeedbackPage() {
   if (success) {
     return (
       <div className="mx-auto max-w-lg py-12 text-center space-y-4">
-        <h1 className="text-3xl font-bold">Thanks!</h1>
-        <p className="text-lg">+{success.creditsEarned} credits earned.</p>
-        <p className="text-muted-foreground">Your balance: {success.newBalance} credits</p>
+        <h1 className="text-3xl font-bold">{t('submit.thanks')}</h1>
+        <p className="text-lg">{t('submit.creditsEarned', { count: success.creditsEarned })}</p>
+        <p className="text-muted-foreground">{t('submit.yourBalance', { count: success.newBalance })}</p>
         <div className="flex justify-center gap-4 pt-4">
-          <Link href="/tasks"><Button>Test another product</Button></Link>
-          <Link href="/my-tasks"><Button variant="outline">View my tasks</Button></Link>
+          <Link href="/tasks"><Button>{t('submit.testAnother')}</Button></Link>
+          <Link href="/my-tasks"><Button variant="outline">{t('submit.viewMyTasks')}</Button></Link>
         </div>
       </div>
     )
@@ -255,7 +250,7 @@ export default function SubmitFeedbackPage() {
 
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
-          <span>Step {step} of {totalSteps}</span>
+          <span>{t('submit.stepOf', { step, total: totalSteps })}</span>
           <span>{Math.round((step / totalSteps) * 100)}%</span>
         </div>
         <Progress value={(step / totalSteps) * 100} />
@@ -267,21 +262,21 @@ export default function SubmitFeedbackPage() {
       {step === 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>Step 1: First Impression</CardTitle>
+            <CardTitle>{t('submit.firstImpressionTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              You just opened {task.targetUrl}. What&apos;s your first reaction? (1-3 sentences)
+              {t('submit.firstImpressionPrompt', { url: task.targetUrl })}
             </p>
             <Textarea
               value={firstImpression}
               onChange={e => setFirstImpression(e.target.value)}
-              placeholder="Describe your first impression..."
+              placeholder={t('submit.firstImpressionPlaceholder')}
               rows={4}
             />
             <div className="flex justify-end">
               <Button onClick={() => setStep(2)} disabled={!firstImpression.trim()}>
-                Next
+                {t('submit.next')}
               </Button>
             </div>
           </CardContent>
@@ -290,24 +285,24 @@ export default function SubmitFeedbackPage() {
 
       {/* Dynamic steps from test plan */}
       {dynamicSteps.map((s, i) => {
-        const stepNum = i + 2 // step 1 is First Impression
+        const stepNum = i + 2
         return step === stepNum ? (
           <Card key={s.id}>
             <CardHeader>
-              <CardTitle>Step {stepNum}: Task {i + 1} of {dynamicSteps.length}</CardTitle>
+              <CardTitle>{t('submit.taskStepTitle', { step: stepNum, task: i + 1, total: dynamicSteps.length })}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">{s.instruction}</p>
               <Textarea
                 value={stepAnswers[s.id] || ''}
                 onChange={e => updateStepAnswer(s.id, e.target.value)}
-                placeholder="Describe your experience..."
+                placeholder={t('submit.describeExperience')}
                 rows={4}
               />
               <div className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(stepNum - 1)}>Back</Button>
+                <Button variant="outline" onClick={() => setStep(stepNum - 1)}>{t('submit.back')}</Button>
                 <Button onClick={() => setStep(stepNum + 1)} disabled={!(stepAnswers[s.id] || '').trim()}>
-                  Next
+                  {t('submit.next')}
                 </Button>
               </div>
             </CardContent>
@@ -319,11 +314,11 @@ export default function SubmitFeedbackPage() {
       {step === totalSteps && (
         <Card>
           <CardHeader>
-            <CardTitle>Step {totalSteps}: Summary</CardTitle>
+            <CardTitle>{t('submit.summaryTitle', { step: totalSteps })}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label>Would you recommend this product? (1-10)</Label>
+              <Label>{t('submit.recommendQuestion')}</Label>
               <div className="flex items-center gap-4">
                 <span className="text-sm text-muted-foreground">1</span>
                 <Slider
@@ -339,17 +334,17 @@ export default function SubmitFeedbackPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Best part</Label>
-              <Textarea value={best} onChange={e => setBest(e.target.value)} placeholder="What did you like most?" rows={3} />
+              <Label>{t('submit.bestPart')}</Label>
+              <Textarea value={best} onChange={e => setBest(e.target.value)} placeholder={t('submit.bestPlaceholder')} rows={3} />
             </div>
             <div className="space-y-2">
-              <Label>Worst part / most confusing thing</Label>
-              <Textarea value={worst} onChange={e => setWorst(e.target.value)} placeholder="What was confusing or could be improved?" rows={3} />
+              <Label>{t('submit.worstPart')}</Label>
+              <Textarea value={worst} onChange={e => setWorst(e.target.value)} placeholder={t('submit.worstPlaceholder')} rows={3} />
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Label>Screen recording URL (optional)</Label>
-                {autoRecorded && screenRecUrl && <Badge variant="secondary">Auto Recorded</Badge>}
+                <Label>{t('submit.screenRecLabel')}</Label>
+                {autoRecorded && screenRecUrl && <Badge variant="secondary">{t('submit.autoRecorded')}</Badge>}
               </div>
               <Input value={screenRecUrl} onChange={e => setScreenRecUrl(e.target.value)} placeholder="https://www.loom.com/..." readOnly={autoRecorded && !!screenRecUrl} className={autoRecorded && screenRecUrl ? 'opacity-70' : ''} />
               {screenRecUrl && (
@@ -358,8 +353,8 @@ export default function SubmitFeedbackPage() {
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Label>Audio feedback URL (optional)</Label>
-                {autoRecorded && audioUrl && <Badge variant="secondary">Auto Recorded</Badge>}
+                <Label>{t('submit.audioLabel')}</Label>
+                {autoRecorded && audioUrl && <Badge variant="secondary">{t('submit.autoRecorded')}</Badge>}
               </div>
               <Input value={audioUrl} onChange={e => setAudioUrl(e.target.value)} placeholder="https://..." readOnly={autoRecorded && !!audioUrl} className={autoRecorded && audioUrl ? 'opacity-70' : ''} />
               {audioUrl && (
@@ -367,9 +362,9 @@ export default function SubmitFeedbackPage() {
               )}
             </div>
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(totalSteps - 1)}>Back</Button>
+              <Button variant="outline" onClick={() => setStep(totalSteps - 1)}>{t('submit.back')}</Button>
               <Button onClick={handleSubmit} disabled={submitting || !best.trim() || !worst.trim()}>
-                {submitting ? 'Submitting...' : 'Submit Feedback'}
+                {submitting ? t('submit.submitting') : t('submit.submitFeedback')}
               </Button>
             </div>
           </CardContent>

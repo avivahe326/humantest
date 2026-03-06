@@ -2,8 +2,11 @@
 
 import { useState } from 'react'
 
+import { useTranslation } from '@/lib/i18n'
+
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
+  const { t } = useTranslation()
 
   return (
     <button
@@ -14,7 +17,7 @@ export function CopyButton({ text }: { text: string }) {
       }}
       className="shrink-0 rounded px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted-foreground/10 transition-colors"
     >
-      {copied ? 'Copied!' : 'Copy'}
+      {copied ? t('common.copied') : t('common.copy')}
     </button>
   )
 }
