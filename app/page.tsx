@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Image from 'next/image'
 import { SampleReport } from './sample-report'
 import { CopyButton } from './copy-button'
 
@@ -9,7 +10,8 @@ export default function LandingPage() {
     <div className="space-y-24 pb-16">
       {/* Hero */}
       <section className="flex flex-col items-center gap-6 pt-16 text-center">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl flex items-center gap-3 justify-center">
+          <Image src="/icon.png" alt="human_test logo" width={56} height={56} className="rounded-lg" />
           <span className="font-mono">human_test()</span>
         </h1>
         <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
