@@ -11,7 +11,7 @@ const execFileAsync = promisify(execFile)
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.aicodewith.com',
+  baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
 })
 
 interface ReportIssue {
@@ -263,11 +263,13 @@ async function tryCreatePR(
 
     if (!appliedAny) return null
 
+    const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+
     // Commit and push
     await execFileAsync('git', ['add', '-A'], { cwd: repoDir })
     await execFileAsync('git', [
-      'commit', '-m', `fix: apply human_test() usability fixes for task ${taskId}\n\nAutomated fixes based on real human usability testing feedback.\nSee: https://human-test.work/tasks/${taskId}`,
-    ], { cwd: repoDir, env: { ...process.env, GIT_AUTHOR_NAME: 'human_test', GIT_AUTHOR_EMAIL: 'bot@human-test.work', GIT_COMMITTER_NAME: 'human_test', GIT_COMMITTER_EMAIL: 'bot@human-test.work' } })
+      'commit', '-m', `fix: apply human_test() usability fixes for task ${taskId}\n\nAutomated fixes based on real human usability testing feedback.\nSee: ${appUrl}/tasks/${taskId}`,
+    ], { cwd: repoDir, env: { ...process.env, GIT_AUTHOR_NAME: 'human_test', GIT_AUTHOR_EMAIL: 'noreply@human-test.work', GIT_COMMITTER_NAME: 'human_test', GIT_COMMITTER_EMAIL: 'noreply@human-test.work' } })
 
     await execFileAsync('git', ['push', '-u', 'origin', branchName], { cwd: repoDir, timeout: 30000 })
 
@@ -322,12 +324,13 @@ async function createPullRequest(
   branch: string,
   taskId: string,
 ): Promise<string> {
+  const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
   const title = `fix: usability issues found by human_test()`
   const body = `## Automated Usability Fixes
 
-These fixes were generated based on real human usability testing feedback from [human_test()](https://human-test.work).
+These fixes were generated based on real human usability testing feedback from [human_test()](${appUrl}).
 
-**Task:** https://human-test.work/tasks/${taskId}
+**Task:** ${appUrl}/tasks/${taskId}
 
 ### What happened
 1. Real human testers used the product and provided structured feedback

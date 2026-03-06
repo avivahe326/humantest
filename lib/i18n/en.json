@@ -118,7 +118,7 @@
     "repoSection": "Code Fix Suggestions (optional)",
     "repoUrl": "Repository URL",
     "repoUrlPlaceholder": "https://github.com/user/repo",
-    "repoUrlHint": "Grant 'avivahe326' read access for code suggestions, or write access for auto-PR.",
+    "repoUrlHint": "Grant the platform's GitHub account read access for code suggestions, or write access for auto-PR.",
     "repoBranch": "Branch (optional)",
     "repoBranchPlaceholder": "main (defaults to repo default)"
   },

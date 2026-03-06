@@ -25,6 +25,7 @@
 # misc
 .DS_Store
 *.pem
+/_bmad-output/
 
 # debug
 npm-debug.log*

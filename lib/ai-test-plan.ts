@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.aicodewith.com',
+  baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
 })
 
 export interface TestStep {

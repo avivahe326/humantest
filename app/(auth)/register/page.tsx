@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [sendingCode, setSendingCode] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const [emailVerification, setEmailVerification] = useState(true)
   const { t } = useTranslation()
 
   // Form fields
@@ -26,6 +27,14 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [code, setCode] = useState('')
+
+  // Check if email verification is required
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => setEmailVerification(data.emailVerification))
+      .catch(() => {})
+  }, [])
 
   // Cooldown timer
   useEffect(() => {
@@ -93,17 +102,23 @@ export default function RegisterPage() {
     e.preventDefault()
     setError('')
 
-    if (!code || code.length !== 6) {
+    if (!emailVerification) {
+      // Direct registration without code
+      if (!validateForm()) return
+    } else if (!code || code.length !== 6) {
       setError(t('register.enterVerificationCode'))
       return
     }
 
     setLoading(true)
     try {
+      const body = emailVerification
+        ? { name, email, password, code }
+        : { name, email, password }
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, code }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -139,9 +154,11 @@ export default function RegisterPage() {
         <CardHeader>
           <CardTitle className="text-2xl">{t('register.title')}</CardTitle>
           <CardDescription>
-            {codeSent
-              ? t('register.subtitleCode')
-              : t('register.subtitle')}
+            {!emailVerification
+              ? t('register.subtitle')
+              : codeSent
+                ? t('register.subtitleCode')
+                : t('register.subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -193,7 +210,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {codeSent && (
+            {emailVerification && codeSent && (
               <div className="space-y-2">
                 <Label htmlFor="code">{t('register.verificationCode')}</Label>
                 <Input
@@ -211,7 +228,11 @@ export default function RegisterPage() {
 
             {error && <p className="text-sm text-red-500">{error}</p>}
 
-            {!codeSent ? (
+            {!emailVerification ? (
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? t('register.creatingAccount') : t('register.signUp')}
+              </Button>
+            ) : !codeSent ? (
               <Button
                 type="button"
                 className="w-full"

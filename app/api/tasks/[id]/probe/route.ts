@@ -68,7 +68,8 @@ function checkFrameHeaders(response: Response): { embeddable: boolean; reason?: 
 
     if (frameAncestors) {
       const value = frameAncestors.toLowerCase()
-      if (!value.includes('*') && !value.includes('human-test.work')) {
+      const appHost = process.env.NEXTAUTH_URL ? new URL(process.env.NEXTAUTH_URL).hostname : 'localhost'
+      if (!value.includes('*') && !value.includes(appHost)) {
         return { embeddable: false, reason: 'csp-frame-ancestors' }
       }
     }

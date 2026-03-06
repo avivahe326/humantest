@@ -8,7 +8,7 @@ function getTransporter(): nodemailer.Transporter {
   if (globalForMailer.mailer) return globalForMailer.mailer
 
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.mxhichina.com',
+    host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT) || 465,
     secure: true,
     auth: {
