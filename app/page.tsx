@@ -100,6 +100,36 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Closed Loop: Agent Auto-Fix */}
+      <section className="space-y-8">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">{t('landing.closedLoopTitle')}</h2>
+          <p className="mx-auto mt-2 max-w-2xl text-muted-foreground">
+            {t('landing.closedLoopDesc')}
+          </p>
+        </div>
+        <div className="mx-auto max-w-2xl">
+          <div className="relative space-y-0">
+            {[
+              { num: '1', text: t('landing.closedLoopStep1') },
+              { num: '2', text: t('landing.closedLoopStep2') },
+              { num: '3', text: t('landing.closedLoopStep3') },
+              { num: '4', text: t('landing.closedLoopStep4') },
+            ].map((step, i) => (
+              <div key={i} className="flex items-start gap-4 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                  {step.num}
+                </div>
+                <p className="pt-1 text-sm">{step.text}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 rounded bg-muted p-4 text-xs text-muted-foreground">
+            {t('landing.closedLoopNote')}
+          </p>
+        </div>
+      </section>
+
       {/* For Developers */}
       <section className="space-y-6">
         <h2 className="text-center text-2xl font-bold">{t('landing.forDevelopers')}</h2>
