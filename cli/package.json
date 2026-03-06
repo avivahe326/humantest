@@ -1,0 +1,27 @@
+{
+  "name": "humantest-app",
+  "version": "1.2.0",
+  "description": "CLI for human_test() — real human usability testing platform",
+  "bin": {
+    "humantest": "bin/humantest.mjs"
+  },
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "testing",
+    "usability",
+    "ux",
+    "human-testing",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avivahe326/humantest.git"
+  },
+  "files": [
+    "bin/"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
