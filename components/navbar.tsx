@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
@@ -33,7 +34,8 @@ export function Navbar() {
     <nav className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <div className="flex items-center gap-6">
-          <Link href="/" className="font-mono text-lg font-bold">
+          <Link href="/" className="flex items-center gap-2 font-mono text-lg font-bold">
+            <Image src="/icon.png" alt="human_test logo" width={24} height={24} className="rounded" />
             human_test()
           </Link>
           <div className="hidden items-center gap-4 sm:flex">
