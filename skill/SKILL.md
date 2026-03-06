@@ -155,6 +155,21 @@ Every report contains these exact sections in order:
 - **Metadata table**: always the first section, machine-readable key-value pairs
 - **NPS scores**: appear in Metadata (average) and NPS Analysis (per-tester breakdown)
 
+## Agent auto-fix workflow
+
+The structured report format is designed for a closed-loop workflow: your agent calls `human_test()`, receives the report, and automatically fixes the issues found — no human intervention needed after testing.
+
+### Recommended flow
+
+1. Call `human_test()` with your product URL (include `webhookUrl` to get notified)
+2. Wait for the report (poll `/api/skill/status/<taskId>` or receive webhook)
+3. Parse the `## Issues` section — each issue has `[SEVERITY]`, Evidence, Impact, and Recommendation
+4. For `[CRITICAL]` and `[MAJOR]` issues, use the **Recommendation** field to generate targeted code fixes
+5. Create commits or PRs for each fix
+6. (Optional) Call `human_test()` again to verify the fixes
+
+Each issue's **Evidence** tells you what went wrong, **Impact** tells you why it matters, and **Recommendation** tells you exactly what to fix. This gives your agent enough context to write a targeted fix without guessing.
+
 ## Links
 
 - Web platform: https://human-test.work
