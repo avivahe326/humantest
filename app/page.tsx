@@ -112,6 +112,24 @@ const { taskId } = await response.json();
         </Card>
       </section>
 
+      {/* Install as Agent Skill */}
+      <section className="space-y-6 text-center">
+        <h2 className="text-2xl font-bold">Install as Agent Skill</h2>
+        <p className="mx-auto max-w-xl text-muted-foreground">
+          Add human testing to any AI coding agent — Claude Code, Cursor, Copilot, Gemini CLI, and 30+ more.
+        </p>
+        <Card className="mx-auto max-w-lg">
+          <CardContent className="pt-6">
+            <pre className="rounded bg-muted p-4 text-sm text-left">
+              <code>npx skills add avivahe326/human-test-skill</code>
+            </pre>
+          </CardContent>
+        </Card>
+        <p className="text-xs text-muted-foreground">
+          Powered by <a href="https://skills.sh" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">skills.sh</a> open agent skills ecosystem
+        </p>
+      </section>
+
       {/* For Testers */}
       <section className="space-y-6 text-center">
         <h2 className="text-2xl font-bold">For Testers</h2>
