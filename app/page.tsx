@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SampleReport } from './sample-report'
+import { CopyButton } from './copy-button'
 
 export default function LandingPage() {
   return (
@@ -32,9 +33,10 @@ export default function LandingPage() {
         </p>
         <Card className="mx-auto max-w-lg">
           <CardContent className="pt-6">
-            <pre className="rounded bg-muted p-4 text-sm text-left">
-              <code>npx skills add avivahe326/human-test-skill</code>
-            </pre>
+            <div className="flex items-center gap-2 rounded bg-muted p-4">
+              <pre className="flex-1 text-sm overflow-x-auto"><code>npx skills add avivahe326/human-test-skill</code></pre>
+              <CopyButton text="npx skills add avivahe326/human-test-skill" />
+            </div>
           </CardContent>
         </Card>
         <p className="text-xs text-muted-foreground">
