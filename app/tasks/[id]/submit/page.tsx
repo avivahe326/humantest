@@ -180,7 +180,9 @@ export default function SubmitFeedbackPage() {
   if (!session) { router.push('/login'); return null }
   if (!task) return <div className="py-12 text-center text-red-500">{error || 'Task not found'}</div>
 
-  const totalSteps = 2
+  const dynamicSteps = task.requirements?.steps ?? []
+  // Step 1 = First Impression, Steps 2..N = dynamic steps, Last step = Summary
+  const totalSteps = 1 + dynamicSteps.length + 1
 
   function updateStepAnswer(stepId: string, answer: string) {
     setStepAnswers(prev => ({ ...prev, [stepId]: answer }))
@@ -197,7 +199,11 @@ export default function SubmitFeedbackPage() {
         body: JSON.stringify({
           rawData: {
             firstImpression,
-            steps: [],
+            steps: dynamicSteps.map(s => ({
+              id: s.id,
+              instruction: s.instruction,
+              answer: stepAnswers[s.id] || '',
+            })),
             nps,
             best,
             worst,
@@ -282,11 +288,38 @@ export default function SubmitFeedbackPage() {
         </Card>
       )}
 
-      {/* Step 2: Summary */}
-      {step === 2 && (
+      {/* Dynamic steps from test plan */}
+      {dynamicSteps.map((s, i) => {
+        const stepNum = i + 2 // step 1 is First Impression
+        return step === stepNum ? (
+          <Card key={s.id}>
+            <CardHeader>
+              <CardTitle>Step {stepNum}: Task {i + 1} of {dynamicSteps.length}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">{s.instruction}</p>
+              <Textarea
+                value={stepAnswers[s.id] || ''}
+                onChange={e => updateStepAnswer(s.id, e.target.value)}
+                placeholder="Describe your experience..."
+                rows={4}
+              />
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(stepNum - 1)}>Back</Button>
+                <Button onClick={() => setStep(stepNum + 1)} disabled={!(stepAnswers[s.id] || '').trim()}>
+                  Next
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null
+      })}
+
+      {/* Final Step: Summary */}
+      {step === totalSteps && (
         <Card>
           <CardHeader>
-            <CardTitle>Step 2: Summary</CardTitle>
+            <CardTitle>Step {totalSteps}: Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -334,7 +367,7 @@ export default function SubmitFeedbackPage() {
               )}
             </div>
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+              <Button variant="outline" onClick={() => setStep(totalSteps - 1)}>Back</Button>
               <Button onClick={handleSubmit} disabled={submitting || !best.trim() || !worst.trim()}>
                 {submitting ? 'Submitting...' : 'Submit Feedback'}
               </Button>
