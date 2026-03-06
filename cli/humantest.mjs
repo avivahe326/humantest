@@ -112,6 +112,8 @@ async function init() {
       console.log('  Aborted.')
       process.exit(0)
     }
+    console.log('  Removing old installation...')
+    run(`rm -rf "${installDir}"`)
   }
 
   // 1. Choose mode
