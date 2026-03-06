@@ -1,6 +1,6 @@
 {
   "name": "humantest-app",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "CLI for human_test() — real human usability testing platform",
   "bin": {
     "humantest": "bin/humantest.mjs"
