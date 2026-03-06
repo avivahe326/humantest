@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
 import { sendWebhook } from '@/lib/webhook'
 import { analyzeMediaForFeedback, generateAggregateReport } from '@/lib/gemini'
+import { runCodeFixAnalysis } from '@/lib/code-fixer'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -152,7 +153,10 @@ export async function generateReport(taskId: string): Promise<string> {
       where: { id: taskId, report: null },
       data: { report, reportStatus: 'COMPLETED' },
     })
-    if (task.webhookUrl) {
+    if (task.repoUrl) {
+      await prisma.task.update({ where: { id: taskId }, data: { codeFixStatus: 'GENERATING' } })
+      runCodeFixAnalysis(taskId).catch(err => console.error('Code fix error:', err))
+    } else if (task.webhookUrl) {
       try { await sendWebhook(taskId) } catch (err) { console.error('Webhook error:', err) }
     }
     return report
@@ -220,7 +224,10 @@ export async function generateReport(taskId: string): Promise<string> {
     data: { report, reportStatus: 'COMPLETED' },
   })
 
-  if (task.webhookUrl) {
+  if (task.repoUrl) {
+    await prisma.task.update({ where: { id: taskId }, data: { codeFixStatus: 'GENERATING' } })
+    runCodeFixAnalysis(taskId).catch(err => console.error('Code fix error:', err))
+  } else if (task.webhookUrl) {
     try { await sendWebhook(taskId) } catch (err) { console.error('Webhook error:', err) }
   }
 

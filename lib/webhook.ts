@@ -11,6 +11,7 @@ export async function sendWebhook(taskId: string): Promise<void> {
       targetUrl: true,
       report: true,
       webhookUrl: true,
+      codeFixPrUrl: true,
     },
   })
 
@@ -46,6 +47,7 @@ export async function sendWebhook(taskId: string): Promise<void> {
         title: task.title,
         targetUrl: task.targetUrl,
         report: task.report,
+        codeFixPrUrl: task.codeFixPrUrl || undefined,
         completedAt: new Date().toISOString(),
       }),
       signal: controller.signal,

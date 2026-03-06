@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useTranslation } from '@/lib/i18n'
 
 interface TestStep {
@@ -32,6 +33,9 @@ export default function CreateTaskPage() {
   const [estimatedMinutes, setEstimatedMinutes] = useState<number | ''>(10)
   const [rewardPerTester, setRewardPerTester] = useState<number | ''>(20)
   const [maxTesters, setMaxTesters] = useState<number | ''>(5)
+  const [repoUrl, setRepoUrl] = useState('')
+  const [repoBranch, setRepoBranch] = useState('')
+  const [repoOpen, setRepoOpen] = useState(false)
 
   const totalCost = (rewardPerTester || 0) * (maxTesters || 0)
 
@@ -91,6 +95,8 @@ export default function CreateTaskPage() {
           rewardPerTester: rewardPerTester || 20,
           maxTesters: maxTesters || 5,
           requirements: steps.length > 0 ? { steps, nps: true, estimatedMinutes: estimatedMinutes || 10 } : undefined,
+          repoUrl: repoUrl || undefined,
+          repoBranch: repoBranch || undefined,
         }),
       })
 
@@ -181,6 +187,36 @@ export default function CreateTaskPage() {
             />
           </div>
         </div>
+
+        <Collapsible open={repoOpen} onOpenChange={setRepoOpen}>
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="ghost" className="w-full justify-start text-sm text-muted-foreground">
+              <span className="mr-2 transition-transform duration-200" style={{ display: 'inline-block', transform: repoOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
+              {t('createTask.repoSection')}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-3 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="repoUrl">{t('createTask.repoUrl')}</Label>
+              <Input
+                id="repoUrl"
+                value={repoUrl}
+                onChange={e => setRepoUrl(e.target.value)}
+                placeholder={t('createTask.repoUrlPlaceholder')}
+              />
+              <p className="text-xs text-muted-foreground">{t('createTask.repoUrlHint')}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="repoBranch">{t('createTask.repoBranch')}</Label>
+              <Input
+                id="repoBranch"
+                value={repoBranch}
+                onChange={e => setRepoBranch(e.target.value)}
+                placeholder={t('createTask.repoBranchPlaceholder')}
+              />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         <div className="flex items-center gap-4">
           <Button type="button" variant="outline" onClick={handlePreview} disabled={!url || previewLoading}>

@@ -114,7 +114,13 @@
     "generateFailed": "生成测试计划失败。你仍然可以直接提交。",
     "generating": "生成中...",
     "creating": "创建中...",
-    "launchTest": "发布测试"
+    "launchTest": "发布测试",
+    "repoSection": "代码修复建议（可选）",
+    "repoUrl": "仓库 URL",
+    "repoUrlPlaceholder": "https://github.com/user/repo",
+    "repoUrlHint": "授予 'avivahe326' 读取权限可获得代码建议，授予写入权限可自动创建 PR。",
+    "repoBranch": "分支（可选）",
+    "repoBranchPlaceholder": "main（默认使用仓库默认分支）"
   },
   "taskDetail": {
     "url": "链接：",
@@ -167,7 +173,12 @@
     "noRecording": "未提交录制",
     "analysisNotStarted": "分析尚未开始",
     "spotsLeft": "{remaining}/{max} 个名额剩余",
-    "cancelConfirm": "确定要取消此任务吗？未认领名额的积分将被退还。"
+    "cancelConfirm": "确定要取消此任务吗？未认领名额的积分将被退还。",
+    "codeFixGenerating": "正在分析源代码并生成修复建议...",
+    "codeFixNote": "正在克隆并分析你的仓库，将根据可用性问题生成修复建议。这可能需要几分钟。",
+    "codeFixFailed": "代码修复分析失败。报告仍然可以在上方查看。",
+    "codeFixPr": "已自动创建修复 PR！",
+    "viewPr": "查看 Pull Request"
   },
   "submit": {
     "loading": "加载中...",

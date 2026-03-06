@@ -13,7 +13,7 @@ export async function GET(
 
   const task = await prisma.task.findUnique({
     where: { id },
-    select: { reportStatus: true, report: true, creatorId: true, updatedAt: true },
+    select: { reportStatus: true, report: true, creatorId: true, updatedAt: true, codeFixStatus: true, codeFixPrUrl: true },
   })
 
   if (!task) {
@@ -26,6 +26,8 @@ export async function GET(
     reportStatus: task.reportStatus,
     hasReport: task.report !== null,
     updatedAt: task.updatedAt.toISOString(),
+    codeFixStatus: task.codeFixStatus,
+    codeFixPrUrl: task.codeFixPrUrl,
   }
 
   // Include report content when completed so frontend can display immediately

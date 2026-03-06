@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireApiKey } from '@/lib/require-api-key'
-import { createTaskSchema, isSafeTargetUrl } from '@/lib/validate'
+import { createTaskSchema, isSafeTargetUrl, isValidRepoUrl } from '@/lib/validate'
 import { spendCredits } from '@/lib/credits'
 import { generateTestPlan } from '@/lib/ai-test-plan'
 import { prisma } from '@/lib/prisma'
@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
     const data = parsed.data
     if (!isSafeTargetUrl(data.url)) {
       return withCors(NextResponse.json({ error: 'Invalid URL. Only http and https URLs are allowed.' }, { status: 400 }))
+    }
+
+    if (data.repoUrl && !isValidRepoUrl(data.repoUrl)) {
+      return withCors(NextResponse.json({ error: 'Invalid repo URL. Only GitHub and Gitee HTTPS URLs are supported.' }, { status: 400 }))
     }
 
     const maxTesters = data.maxTesters ?? 5
@@ -74,6 +78,8 @@ export async function POST(request: NextRequest) {
         rewardPerTester,
         estimatedMinutes: data.estimatedMinutes ?? 10,
         webhookUrl: data.webhookUrl,
+        repoUrl: data.repoUrl,
+        repoBranch: data.repoBranch,
         creatorId: user!.id,
       },
     })

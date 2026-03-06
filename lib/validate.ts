@@ -29,6 +29,8 @@ export const createTaskSchema = z.object({
   rewardPerTester: z.number().int().min(1).max(1000).optional(),
   estimatedMinutes: z.number().int().min(1).max(120).optional(),
   webhookUrl: z.url().optional(),
+  repoUrl: z.string().max(2000).optional(),
+  repoBranch: z.string().max(200).optional(),
 })
 
 const httpsUrlSchema = z.url().refine(
@@ -80,6 +82,20 @@ export function isSafeTargetUrl(urlStr: string): boolean {
   try {
     const url = new URL(urlStr)
     return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+export function isValidRepoUrl(urlStr: string): boolean {
+  try {
+    const url = new URL(urlStr)
+    if (url.protocol !== 'https:') return false
+    const host = url.hostname.toLowerCase()
+    if (host !== 'github.com' && host !== 'gitee.com') return false
+    // Must have at least owner/repo in path
+    const parts = url.pathname.replace(/\.git$/, '').split('/').filter(Boolean)
+    return parts.length >= 2
   } catch {
     return false
   }

@@ -78,6 +78,8 @@ Response (when completed):
 | `rewardPerTester` | No | 20 | Credits per tester |
 | `estimatedMinutes` | No | 10 | Expected test duration |
 | `webhookUrl` | No | — | HTTPS URL to receive the report on completion |
+| `repoUrl` | No | — | GitHub/Gitee repo URL for code-level fix suggestions |
+| `repoBranch` | No | repo default | Branch to analyze (only used with repoUrl) |
 
 ## Async webhook
 
@@ -90,6 +92,7 @@ If you provide a `webhookUrl`, the platform will POST the full report to that UR
   "title": "Test: example.com",
   "targetUrl": "https://example.com",
   "report": "## Executive Summary\n...",
+  "codeFixPrUrl": "https://github.com/user/repo/pull/1",
   "completedAt": "2026-03-02T12:00:00Z"
 }
 ```
@@ -169,6 +172,31 @@ The structured report format is designed for a closed-loop workflow: your agent 
 6. (Optional) Call `human_test()` again to verify the fixes
 
 Each issue's **Evidence** tells you what went wrong, **Impact** tells you why it matters, and **Recommendation** tells you exactly what to fix. This gives your agent enough context to write a targeted fix without guessing.
+
+## Repo-aware code fix suggestions
+
+If you pass a `repoUrl`, the platform will clone your repo after the report is generated and produce **file-level code fix suggestions** (with unified diffs) appended to the report as a `## Code Fix Suggestions` section.
+
+### Two modes (auto-detected)
+
+**Mode 1 — Read-only:** Grant GitHub user `avivahe326` read access to your repo. After the report, the platform clones the repo, analyzes the code against reported issues, and appends code-level diffs to the report.
+
+**Mode 2 — Developer access:** Grant `avivahe326` write access. Same as Mode 1, plus: creates a branch `human-test/fixes-<taskId>`, applies the diffs, pushes, and opens a PR. The PR URL is returned in the webhook payload as `codeFixPrUrl` and in the status API.
+
+### Example with repoUrl
+
+```bash
+curl -X POST https://human-test.work/api/skill/human-test \
+  -H "Authorization: Bearer <your-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-product.com",
+    "focus": "Test the checkout flow",
+    "repoUrl": "https://github.com/your-org/your-repo",
+    "repoBranch": "main",
+    "webhookUrl": "https://your-server.com/webhook"
+  }'
+```
 
 ## Links
 

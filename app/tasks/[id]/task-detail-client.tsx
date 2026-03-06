@@ -46,6 +46,8 @@ interface TaskDetailProps {
     status: string
     report: string | null
     reportStatus: string | null
+    codeFixStatus: string | null
+    codeFixPrUrl: string | null
     createdAt: string
     claimedCount: number
     submittedCount: number
@@ -157,6 +159,8 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const [error, setError] = useState('')
   const [reportStatus, setReportStatus] = useState(task.reportStatus)
   const [report, setReport] = useState(task.report)
+  const [codeFixStatus, setCodeFixStatus] = useState(task.codeFixStatus)
+  const [codeFixPrUrl, setCodeFixPrUrl] = useState(task.codeFixPrUrl)
   const [progress, setProgress] = useState(0)
   const [feedbackStatuses, setFeedbackStatuses] = useState<FeedbackStatusInfo[]>([])
   const [expandedFeedbacks, setExpandedFeedbacks] = useState<Set<string>>(new Set())
@@ -168,6 +172,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   try { hostname = new URL(task.targetUrl).hostname } catch {}
 
   const isGenerating = reportStatus === 'GENERATING'
+  const isCodeFixing = codeFixStatus === 'GENERATING'
 
   const updateProgress = useCallback(() => {
     if (!startTimeRef.current) return
@@ -191,7 +196,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   }, [isGenerating, updateProgress])
 
   useEffect(() => {
-    if (!isGenerating) return
+    if (!isGenerating && !isCodeFixing) return
 
     const fetchStatus = async () => {
       try {
@@ -207,6 +212,13 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
           setFeedbackStatuses(data.feedbacks)
         }
 
+        if (data.codeFixStatus) {
+          setCodeFixStatus(data.codeFixStatus)
+        }
+        if (data.codeFixPrUrl) {
+          setCodeFixPrUrl(data.codeFixPrUrl)
+        }
+
         if (data.reportStatus !== 'GENERATING') {
           setReportStatus(data.reportStatus)
           if (data.hasReport && data.report) {
@@ -220,7 +232,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
     fetchStatus()
     const interval = setInterval(fetchStatus, 3000)
     return () => clearInterval(interval)
-  }, [isGenerating, task.id, router])
+  }, [isGenerating, isCodeFixing, task.id, router])
 
   function toggleFeedback(id: string) {
     setExpandedFeedbacks(prev => {
@@ -503,6 +515,43 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {report}
                   </ReactMarkdown>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Code Fix Status */}
+            {isCodeFixing && (
+              <Card>
+                <CardContent className="pt-6 space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-yellow-500 animate-pulse">&#9679;</span>
+                    <span>{t('taskDetail.codeFixGenerating')}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('taskDetail.codeFixNote')}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {codeFixStatus === 'FAILED' && (
+              <Card className="border-yellow-500/50">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-yellow-500">{t('taskDetail.codeFixFailed')}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {codeFixPrUrl && (
+              <Card className="border-green-500/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-500">&#10003;</span>
+                    <span className="text-sm">
+                      {t('taskDetail.codeFixPr')}{' '}
+                      <a href={codeFixPrUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+                        {t('taskDetail.viewPr')}
+                      </a>
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             )}

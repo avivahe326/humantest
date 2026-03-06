@@ -38,6 +38,10 @@ model Task {
   creator          User       @relation(fields: [creatorId], references: [id])
   report           String?    @db.LongText
   reportStatus     String?    @db.VarChar(20)
+  repoUrl          String?    @db.VarChar(2000)
+  repoBranch       String?    @db.VarChar(200)
+  codeFixStatus    String?    @db.VarChar(20)
+  codeFixPrUrl     String?    @db.VarChar(2000)
   claimDeadline    DateTime?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt

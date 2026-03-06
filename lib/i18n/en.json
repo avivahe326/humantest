@@ -114,7 +114,13 @@
     "generateFailed": "Failed to generate test plan. You can still submit without a preview.",
     "generating": "Generating...",
     "creating": "Creating...",
-    "launchTest": "Launch Test"
+    "launchTest": "Launch Test",
+    "repoSection": "Code Fix Suggestions (optional)",
+    "repoUrl": "Repository URL",
+    "repoUrlPlaceholder": "https://github.com/user/repo",
+    "repoUrlHint": "Grant 'avivahe326' read access for code suggestions, or write access for auto-PR.",
+    "repoBranch": "Branch (optional)",
+    "repoBranchPlaceholder": "main (defaults to repo default)"
   },
   "taskDetail": {
     "url": "URL:",
@@ -167,7 +173,12 @@
     "noRecording": "No recording submitted",
     "analysisNotStarted": "Analysis not yet started",
     "spotsLeft": "{remaining}/{max} spots left",
-    "cancelConfirm": "Are you sure you want to cancel this task? Credits for unclaimed slots will be refunded."
+    "cancelConfirm": "Are you sure you want to cancel this task? Credits for unclaimed slots will be refunded.",
+    "codeFixGenerating": "Analyzing source code and generating fix suggestions...",
+    "codeFixNote": "Your repo is being cloned and analyzed against the usability issues. This may take a few minutes.",
+    "codeFixFailed": "Code fix analysis failed. The report is still available above.",
+    "codeFixPr": "Automated fix PR created!",
+    "viewPr": "View Pull Request"
   },
   "submit": {
     "loading": "Loading...",
