@@ -13,7 +13,7 @@ Real human usability testing for AI-built products. Let AI hire humans to test y
 ## Quick Start
 
 ```bash
-npm i -g humantest
+npm i -g humantest-app
 humantest init
 humantest start
 ```
