@@ -309,7 +309,9 @@ ${fb.textFeedback ? `### Text Feedback:\n${fb.textFeedback}` : ''}`
       ? (npsScores.reduce((a, b) => a + b, 0) / npsScores.length).toFixed(1)
       : 'N/A'
 
-  const prompt = `You are a senior UX research analyst. Below are individual analyses from ${feedbackAnalyses.length} usability testers who tested "${task.title}" (${task.targetUrl}).
+  const prompt = `You are a senior UX research analyst. Generate a structured report optimized for AI agents to parse and act on.
+
+Below are individual analyses from ${feedbackAnalyses.length} usability testers who tested "${task.title}" (${task.targetUrl}).
 ${task.focus ? `Focus area: ${task.focus}` : ''}
 
 Average NPS: ${avgNps}/10
@@ -318,16 +320,40 @@ ${testerSections}
 
 ---
 
-Generate a comprehensive usability test report with:
-1. **Executive Summary** (3-5 sentences)
-2. **Key Findings** (ranked by severity, cite specific testers by name)
-3. **Excitement Points** (what users loved, with evidence from video analysis)
-4. **Friction & Pain Points** (critical blockers, with severity: Critical/Major/Minor)
-5. **Usability Issues Timeline** (common patterns across testers)
-6. **NPS Analysis** (breakdown + correlation with observed behavior)
-7. **Recommendations** (prioritized actionable next steps)
+Generate the report with these EXACT section headers and formats:
 
-Use markdown formatting. Reference specific testers and their video observations when citing evidence.`
+## Metadata
+| Field | Value |
+|-------|-------|
+| Product | ${task.title} |
+| URL | ${task.targetUrl} |
+| Testers | ${feedbackAnalyses.length} |
+| Avg NPS | ${avgNps}/10 |
+${task.focus ? `| Focus | ${task.focus} |` : ''}
+
+## Executive Summary
+(3-5 sentences. State the most critical finding first.)
+
+## Issues
+(List ALL issues found. Each issue MUST follow this exact format:)
+### [SEVERITY] Issue title
+- **Evidence:** (cite specific testers by name and reference their video observations/timestamps)
+- **Impact:** (how it affects users — conversion, trust, task completion, etc.)
+- **Recommendation:** (specific, actionable fix)
+SEVERITY must be one of: CRITICAL, MAJOR, MINOR
+
+## Positive Highlights
+(What users loved, with evidence from video analysis. Cite testers by name.)
+
+## NPS Analysis
+(Score breakdown per tester, interpretation, correlation with observed issues)
+
+## Recommendations
+(Prioritized action items. Each must use a priority tag and reference the issue it addresses:)
+- **P0** (fix immediately): ...
+- **P1** (fix this sprint): ...
+- **P2** (next sprint): ...
+- **P3** (backlog): ...`
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',

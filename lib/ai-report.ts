@@ -62,7 +62,19 @@ ${fb.audioUrl ? `**Audio:** ${fb.audioUrl}` : ''}`
     {
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      system: 'You are a UX research analyst. Generate a comprehensive usability test report from tester feedback. Use markdown formatting. Cite specific testers by name when referencing their feedback.',
+      system: `You are a UX research analyst. Generate a structured usability report that is optimized for AI agents to parse and act on. Use markdown formatting with consistent structure. Cite specific testers by name.
+
+IMPORTANT: Follow this exact output format so AI agents can reliably parse the report:
+
+1. Start with a metadata block in a markdown table (product, URL, testers, avg NPS, date)
+2. Use exact section headers as specified
+3. For every issue, use this format:
+   - **[SEVERITY] Issue title** (SEVERITY must be one of: CRITICAL, MAJOR, MINOR)
+   - Evidence: what was observed and by whom
+   - Impact: how it affects users
+   - Recommendation: specific fix
+
+4. For recommendations, use priority tags: P0 (fix immediately), P1 (fix this sprint), P2 (next sprint), P3 (backlog)`,
       messages: [
         {
           role: 'user',
@@ -77,13 +89,29 @@ ${feedbackSections}
 
 ---
 
-Please generate a structured report with these sections:
-1. **Executive Summary** (2-3 sentences)
-2. **Key Findings** (ranked by severity, cite specific testers)
-3. **Usability Issues** (with severity: Critical/Major/Minor)
-4. **Positive Highlights** (what worked well)
-5. **NPS Analysis** (breakdown and interpretation)
-6. **Recommendations** (actionable next steps)`,
+Generate the report with these exact section headers:
+
+## Metadata
+(Markdown table: Product, URL, Testers, Avg NPS, Focus Area, Date)
+
+## Executive Summary
+(3-5 sentences. State the most critical finding first.)
+
+## Issues
+(List ALL issues found. Each issue MUST follow this format:)
+### [SEVERITY] Issue title
+- **Evidence:** (cite specific testers and what they experienced)
+- **Impact:** (how it affects users — conversion, trust, task completion, etc.)
+- **Recommendation:** (specific, actionable fix)
+
+## Positive Highlights
+(What worked well, with evidence from testers)
+
+## NPS Analysis
+(Score breakdown, interpretation, correlation with issues found)
+
+## Recommendations
+(Prioritized action items. Use P0/P1/P2/P3 tags. Each recommendation should reference the issue it addresses.)`,
         },
       ],
       temperature: 0.5,

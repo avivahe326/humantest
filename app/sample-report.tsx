@@ -7,57 +7,71 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-const REPORT = `## 1. Executive Summary
+const REPORT = `## Metadata
 
-A single usability session with tester lizhi revealed a functionally competent product that nonetheless failed to retain user attention within a 78-second session. The user exited the product twice — once to a third-party article about search engine alternatives, and once to a direct competitor (360 Search) — without completing any goal-directed task. The most critical infrastructure issue is the bare nginx 404 on \`sogo.com\`, which creates an immediate trust failure for any user who doesn't already know the correct URL.
+| Field | Value |
+|-------|-------|
+| Product | Sogou Search |
+| URL | sogou.com |
+| Testers | 1 |
+| Avg NPS | 8.0/10 |
 
-## 2. Key Findings
+## Executive Summary
 
-Ranked by severity:
+A single usability session with tester lizhi revealed a critical infrastructure failure — the bare nginx 404 on \`sogo.com\` — that would prevent any new user from reaching the product. The tester exited to a competitor (360 Search) within 78 seconds without completing a single goal-directed search, indicating both an entry-point failure and a lack of task scaffolding on the homepage.
 
-**1. Dead URL at test entry point (Critical)**
-lizhi landed on a bare nginx 404 at \`sogo.com\` for the first ~9 seconds. Recovery only happened because the tester already knew the correct domain. A first-time user has no recovery path — no branded error page, no redirect, no suggestion.
+## Issues
 
-**2. Product failed to retain the user (Critical)**
-lizhi left the product twice within 78 seconds: at ~48s to a 163.com article explicitly about *alternatives* to major search engines, and at ~72s to competitor 360 Search (\`so.com\`). For a search engine, this exit pattern is the core finding.
+### [CRITICAL] Dead URL at test entry point — bare nginx 404 on sogo.com
+- **Evidence:** lizhi landed on a bare nginx 404 at \`sogo.com\` for the first ~9 seconds. Recovery only happened because the tester already knew the correct domain (\`sogou.com\`).
+- **Impact:** First-time users have zero recovery path — no branded error page, no redirect, no suggestion. 100% bounce rate for mistyped URLs.
+- **Recommendation:** Implement a 301 redirect from \`sogo.com\` → \`sogou.com\`, or deploy a branded error page with "Did you mean sogou.com?" recovery link.
 
-**3. No task completion observed (Major)**
-Every query lizhi executed was exploratory or meta. The homepage and sub-product onboarding provided no scaffolding that prompted a real search task. The user evaluated the product rather than used it.
+### [CRITICAL] Product failed to retain user — exited to competitor within 78 seconds
+- **Evidence:** lizhi left the product twice: at ~48s to a 163.com article about search engine *alternatives*, and at ~72s to competitor 360 Search (\`so.com\`).
+- **Impact:** For a search engine, losing users to a competitor article within the first session is a core retention failure.
+- **Recommendation:** Add task scaffolding to the homepage — featured search prompts, category entry points, or a value proposition that gives users a reason to stay.
 
-**4. Pre-populated search query is disorienting (Major)**
-At ~12s, lizhi encountered a trending news query pre-injected into the search box. It's visually ambiguous whether this is user input or a suggestion, which risks accidental searches and erodes trust in the input state.
+### [MAJOR] Pre-populated search query is visually ambiguous
+- **Evidence:** At ~12s, lizhi encountered a trending news query pre-injected into the search box. It's visually indistinguishable from user input.
+- **Impact:** Risks accidental searches and erodes trust in the input state. Users may think they typed something they didn't.
+- **Recommendation:** Use placeholder styling (grayed text) or a distinct "trending" label. Move trending suggestions below the input field.
 
-## 3. Friction & Pain Points
+### [MAJOR] No task completion observed — no goal-directed search executed
+- **Evidence:** Every query lizhi executed was exploratory or meta. The homepage provided no scaffolding to prompt a real search task.
+- **Impact:** Users evaluate the product rather than use it, leading to shallow engagement and early exit.
+- **Recommendation:** Add featured search prompts, category entry points, or contextual suggestions that guide users toward a concrete action.
 
-| Severity | Issue | Tester | Timestamp |
-|----------|-------|--------|-----------|
-| Critical | Bare nginx 404 on \`sogo.com\` — no redirect, no branded error page | lizhi | ~0–9s |
-| Critical | User exited to competitor article mid-session, ended session on rival search engine | lizhi | ~48–69s, ~72s |
-| Major | Pre-populated trending query in search box is visually ambiguous — looks like user input | lizhi | ~12s |
-| Major | No task scaffolding on homepage — user never executed a goal-directed search | lizhi | Full session |
-| Minor | Ming Yi has no onboarding copy or placeholder text scoped to medical queries | lizhi | ~24–30s |
+### [MINOR] Ming Yi (medical search) has no onboarding copy
+- **Evidence:** At ~24-30s, lizhi visited Ming Yi but found no placeholder text or scope description for medical queries.
+- **Impact:** Users don't understand what this sub-product does or how to use it effectively.
+- **Recommendation:** Add placeholder text and a brief descriptor communicating the medical search scope.
 
-## 4. Recommendations
+## Positive Highlights
 
-Prioritized by impact and implementation effort:
+- **Functional core search**: The main search engine at \`sogou.com\` loaded and operated correctly once accessed (lizhi, NPS 8.0)
+- **Sub-product diversity**: Ming Yi (medical) and other verticals show product ambition and category expansion potential
 
-**P0 — Fix the \`sogo.com\` entry point**
-Implement a 301 redirect from \`sogo.com\` to \`sogou.com\`, or deploy a branded error page with a clear "Did you mean sogou.com?" recovery path.
+## NPS Analysis
 
-**P1 — Redesign the search box input state**
-The pre-populated trending query needs a clear visual distinction from user-typed input — use placeholder styling (grayed text), a distinct "trending" label, or move trending suggestions below the input entirely.
+| Tester | NPS | Key Factor |
+|--------|-----|------------|
+| lizhi | 8/10 | Core product works, but entry point failure and lack of engagement scaffolding noted |
 
-**P2 — Add task scaffolding to the homepage**
-The homepage should prompt users toward a concrete action. Consider featured search prompts, category entry points, or a short value proposition statement.
+Average NPS: 8.0/10 — Relatively high despite critical issues, likely because the tester was already familiar with the product. New users hitting the nginx 404 would likely score significantly lower.
 
-**P3 — Add contextual onboarding to Ming Yi**
-The medical search product needs placeholder text and/or a brief descriptor that communicates its scope before the user types.`
+## Recommendations
+
+- **P0** — Implement 301 redirect from \`sogo.com\` → \`sogou.com\` (addresses: Dead URL entry point)
+- **P1** — Redesign search box input state to distinguish trending queries from user input (addresses: Ambiguous pre-populated query)
+- **P1** — Add homepage task scaffolding — featured prompts, category entry points (addresses: No task completion, user retention failure)
+- **P3** — Add contextual onboarding copy to Ming Yi medical search (addresses: Ming Yi has no onboarding)`
 
 export function SampleReport() {
   const [expanded, setExpanded] = useState(false)
 
-  // Show only executive summary + key findings when collapsed
-  const previewEnd = REPORT.indexOf('## 3. Friction')
+  // Show metadata + executive summary + first 2 issues when collapsed
+  const previewEnd = REPORT.indexOf('### [MAJOR] Pre-populated')
   const preview = REPORT.slice(0, previewEnd).trim()
 
   return (

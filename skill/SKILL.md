@@ -100,15 +100,60 @@ If you provide a `webhookUrl`, the platform will POST the full report to that UR
 - Creating a task costs: `rewardPerTester × maxTesters` credits
 - Earn credits by testing other people's products (20 credits per test)
 
-## Report contents
+## Report format (structured for AI agents)
 
-The AI-generated report includes:
-- Executive Summary
-- Key Findings (ranked by severity, citing specific testers)
-- Usability Issues (Critical / Major / Minor)
-- Positive Highlights
-- NPS Analysis with breakdown
-- Actionable Recommendations
+The report is returned as a markdown string in the `report` field. It uses a **consistent, machine-parseable structure** designed for AI agents to read and act on directly — for example, to automatically file issues, create PRs, or prioritize a fix backlog.
+
+### Section structure
+
+Every report contains these exact sections in order:
+
+```markdown
+## Metadata
+| Field | Value |
+|-------|-------|
+| Product | ... |
+| URL | ... |
+| Testers | N |
+| Avg NPS | X.X/10 |
+
+## Executive Summary
+(3-5 sentences, most critical finding first)
+
+## Issues
+### [CRITICAL] Issue title
+- **Evidence:** (specific testers and observations)
+- **Impact:** (effect on users)
+- **Recommendation:** (actionable fix)
+
+### [MAJOR] Issue title
+- **Evidence:** ...
+- **Impact:** ...
+- **Recommendation:** ...
+
+### [MINOR] Issue title
+...
+
+## Positive Highlights
+(What worked well)
+
+## NPS Analysis
+(Score breakdown, interpretation)
+
+## Recommendations
+- **P0** (fix immediately): ... (references issue)
+- **P1** (fix this sprint): ...
+- **P2** (next sprint): ...
+- **P3** (backlog): ...
+```
+
+### Parsing tips for agents
+
+- **Severity levels**: `[CRITICAL]`, `[MAJOR]`, `[MINOR]` — always in brackets in issue headers
+- **Priority tags**: `P0`, `P1`, `P2`, `P3` — in the Recommendations section
+- **Each issue has 3 fields**: Evidence, Impact, Recommendation — always bolded labels
+- **Metadata table**: always the first section, machine-readable key-value pairs
+- **NPS scores**: appear in Metadata (average) and NPS Analysis (per-tester breakdown)
 
 ## Links
 
