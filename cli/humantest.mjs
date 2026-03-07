@@ -147,12 +147,14 @@ async function init() {
       console.log('\n  Warning: No API key provided. Report generation will not work.')
       console.log('  You can add AI_API_KEY to .env later.\n')
     }
+    aiBaseUrl = await ask('Anthropic Base URL (press Enter for official API)')
   } else if (aiProvider === 'openai') {
     aiApiKey = await ask('OpenAI API Key (required for AI reports)')
     if (!aiApiKey) {
       console.log('\n  Warning: No API key provided. Report generation will not work.')
       console.log('  You can add AI_API_KEY to .env later.\n')
     }
+    aiBaseUrl = await ask('OpenAI Base URL (press Enter for official API)')
   } else {
     // openai-compat
     aiApiKey = await ask('API Key')
@@ -217,7 +219,10 @@ async function init() {
     envLines.push(`AI_API_KEY="${aiApiKey}"`)
     // Backward compat: also set ANTHROPIC_API_KEY for existing code paths
     if (providerValue === 'anthropic') envLines.push(`ANTHROPIC_API_KEY="${aiApiKey}"`)
-    if (aiBaseUrl) envLines.push(`AI_BASE_URL="${aiBaseUrl}"`)
+    if (aiBaseUrl) {
+      envLines.push(`AI_BASE_URL="${aiBaseUrl}"`)
+      if (providerValue === 'anthropic') envLines.push(`ANTHROPIC_BASE_URL="${aiBaseUrl}"`)
+    }
     if (aiModel) envLines.push(`AI_MODEL="${aiModel}"`)
   }
   if (smtpHost) {
