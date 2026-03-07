@@ -3,6 +3,7 @@ import { z } from 'zod/v4'
 import { requireAuth } from '@/lib/require-auth'
 import { prisma } from '@/lib/prisma'
 import { generatePresignedUrl } from '@/lib/oss'
+import { isLocalStorage, generateObjectKey, generateLocalUploadToken } from '@/lib/local-storage'
 import { RateLimiter, getClientIp, rateLimitResponse } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
@@ -49,6 +50,14 @@ export async function POST(request: NextRequest) {
 
   if (!claim) {
     return NextResponse.json({ error: 'Invalid or unauthorized claim' }, { status: 403 })
+  }
+
+  if (isLocalStorage()) {
+    const objectKey = generateObjectKey(taskId, claimId, type)
+    const token = generateLocalUploadToken(objectKey)
+    const uploadUrl = `/api/recordings/upload?key=${encodeURIComponent(objectKey)}&token=${encodeURIComponent(token)}`
+    const objectUrl = `/api/recordings/serve/${objectKey.replace('recordings/', '')}`
+    return NextResponse.json({ uploadUrl, objectUrl })
   }
 
   const { uploadUrl, objectUrl } = await generatePresignedUrl(taskId, claimId, type)

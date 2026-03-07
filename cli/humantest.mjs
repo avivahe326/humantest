@@ -222,12 +222,23 @@ async function init() {
     schema = schema.replace(/@db\.\w+(\(\d+\))?/g, '')
     writeFileSync(schemaPath, schema)
     mkdirSync(join(installDir, 'prisma', 'data'), { recursive: true })
+    mkdirSync(join(installDir, 'data', 'recordings'), { recursive: true })
 
     // Remove standalone output for local mode (not needed, avoids cp errors)
     const nextConfigPath = join(installDir, 'next.config.ts')
     let nextConfig = readFileSync(nextConfigPath, 'utf-8')
     nextConfig = nextConfig.replace(/\s*output:\s*'standalone',?\n?/, '\n')
     writeFileSync(nextConfigPath, nextConfig)
+
+    // Add data/recordings to .gitignore
+    const gitignorePath = join(installDir, '.gitignore')
+    try {
+      let gitignore = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : ''
+      if (!gitignore.includes('data/recordings')) {
+        gitignore += '\ndata/recordings\n'
+        writeFileSync(gitignorePath, gitignore)
+      }
+    } catch {}
   }
 
   // ─── Install dependencies ───
