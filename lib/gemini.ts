@@ -34,7 +34,9 @@ interface TaskForAnalysis {
 async function downloadToTemp(url: string, ext: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'media-'))
   const filePath = join(dir, `file${ext}`)
-  const res = await fetch(url)
+  // Relative paths (local storage mode) need a base URL for server-side fetch
+  const fetchUrl = url.startsWith('/') ? `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}${url}` : url
+  const res = await fetch(fetchUrl)
   if (!res.ok) throw new Error(`Failed to download ${url}: ${res.status}`)
   const buffer = Buffer.from(await res.arrayBuffer())
   await writeFile(filePath, buffer)
