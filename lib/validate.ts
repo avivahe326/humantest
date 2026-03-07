@@ -32,11 +32,13 @@ export const createTaskSchema = z.object({
   repoBranch: z.string().max(200).optional(),
 })
 
-const httpsUrlSchema = z.url().refine(
+const recordingUrlSchema = z.string().refine(
   (url) => {
+    // Allow relative paths for local storage (e.g. /api/recordings/serve/...)
+    if (url.startsWith('/')) return true
     try { return new URL(url).protocol === 'https:' } catch { return false }
   },
-  { message: 'URL must use HTTPS protocol' }
+  { message: 'URL must be a relative path or use HTTPS protocol' }
 )
 
 export const submitFeedbackSchema = z.object({
@@ -50,8 +52,8 @@ export const submitFeedbackSchema = z.object({
     best: z.string().max(5000),
     worst: z.string().max(5000),
   }),
-  screenRecUrl: httpsUrlSchema.optional(),
-  audioUrl: httpsUrlSchema.optional(),
+  screenRecUrl: recordingUrlSchema.optional(),
+  audioUrl: recordingUrlSchema.optional(),
 })
 
 const PRIVATE_IP_PATTERNS = [
