@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { AITimeoutError } from '@/lib/ai-client'
 import { requireAuth } from '@/lib/require-auth'
 import { generateTestPlan } from '@/lib/ai-test-plan'
 
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const plan = await generateTestPlan(url, focus, estimatedMinutes)
     return NextResponse.json(plan)
   } catch (err) {
-    if (err instanceof Anthropic.APIConnectionTimeoutError) {
+    if (err instanceof AITimeoutError) {
       console.error('Test plan generation timeout')
       return NextResponse.json({ error: 'AI test plan generation timed out, please try again' }, { status: 504 })
     }

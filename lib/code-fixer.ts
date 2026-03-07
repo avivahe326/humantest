@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { chat } from '@/lib/ai-client'
 import { prisma } from '@/lib/prisma'
 import { sendWebhook } from '@/lib/webhook'
 import { mkdtemp, readdir, readFile, rm } from 'fs/promises'
@@ -8,11 +8,6 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 
 const execFileAsync = promisify(execFile)
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
-})
 
 interface ReportIssue {
   severity: string
@@ -176,10 +171,22 @@ async function generateCodeSuggestions(
     `### [${i.severity}] ${i.title}\n- Evidence: ${i.evidence}\n- Impact: ${i.impact}\n- Recommendation: ${i.recommendation}`
   ).join('\n\n')
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 8192,
-    system: `You are an expert code reviewer. Given usability issues found by real human testers and the relevant source code files, generate specific code-level fix suggestions.
+  const response = await chat(
+    [{
+      role: 'user',
+      content: `## Usability Issues Found by Human Testers
+Product URL: ${targetUrl}
+
+${issueDescriptions}
+
+## Source Code Files
+
+${fileContents}
+
+Generate code fix suggestions for the issues above. Focus on CRITICAL and MAJOR issues first.`,
+    }],
+    {
+      system: `You are an expert code reviewer. Given usability issues found by real human testers and the relevant source code files, generate specific code-level fix suggestions.
 
 For each issue that can be addressed in code, produce a unified diff. If an issue requires design/copy changes rather than code changes, describe the change in prose instead.
 
@@ -202,24 +209,13 @@ Output format — for each fixable issue:
 **Explanation:** Brief description of why this fix addresses the issue.
 
 If an issue cannot be fixed in code (e.g., requires new assets, infrastructure changes, or policy decisions), say so briefly and skip it.`,
-    messages: [{
-      role: 'user',
-      content: `## Usability Issues Found by Human Testers
-Product URL: ${targetUrl}
+      maxTokens: 8192,
+      temperature: 0.3,
+      timeoutMs: 300000,
+    }
+  )
 
-${issueDescriptions}
-
-## Source Code Files
-
-${fileContents}
-
-Generate code fix suggestions for the issues above. Focus on CRITICAL and MAJOR issues first.`,
-    }],
-    temperature: 0.3,
-  }, { timeout: 300000 })
-
-  const text = response.content[0]
-  return (text && text.type === 'text') ? text.text : 'No code suggestions generated.'
+  return response.text || 'No code suggestions generated.'
 }
 
 async function tryCreatePR(

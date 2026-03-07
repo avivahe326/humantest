@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { chat, type ContentBlock } from '@/lib/ai-client'
 import { writeFile, unlink, mkdtemp, readFile, readdir } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -6,11 +6,6 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 
 const execFileAsync = promisify(execFile)
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
-})
 
 interface RawData {
   firstImpression: string
@@ -159,7 +154,7 @@ ${feedback.audioUrl ? `- Audio feedback was also recorded (URL: ${feedback.audio
 
     if (batches.length <= 1) {
       // Single batch — analyze directly
-      const contentBlocks: Anthropic.Messages.ContentBlockParam[] = []
+      const contentBlocks: ContentBlock[] = []
       for (let i = 0; i < allFramePaths.length; i++) {
         const frameData = await readFile(allFramePaths[i])
         const b64 = frameData.toString('base64')
@@ -170,7 +165,8 @@ ${feedback.audioUrl ? `- Audio feedback was also recorded (URL: ${feedback.audio
         })
         contentBlocks.push({
           type: 'image',
-          source: { type: 'base64', media_type: 'image/jpeg', data: b64 },
+          mediaType: 'image/jpeg',
+          base64Data: b64,
         })
       }
 
@@ -189,15 +185,12 @@ Analyze the screenshots carefully. They are in chronological order (one every 3 
 Use markdown formatting. Be specific about what you observed in each screenshot.`,
       })
 
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        messages: [{ role: 'user', content: contentBlocks }],
-        temperature: 0.3,
-      }, { timeout: 300000 })
+      const response = await chat(
+        [{ role: 'user', content: contentBlocks }],
+        { maxTokens: 4096, temperature: 0.3, timeoutMs: 300000 }
+      )
 
-      const text = response.content[0]
-      return (text && text.type === 'text') ? text.text : 'Analysis produced no output.'
+      return response.text || 'Analysis produced no output.'
     }
 
     // Multiple batches — analyze each batch, then merge
@@ -206,7 +199,7 @@ Use markdown formatting. Be specific about what you observed in each screenshot.
 
     for (let b = 0; b < batches.length; b++) {
       const batch = batches[b]
-      const contentBlocks: Anthropic.Messages.ContentBlockParam[] = []
+      const contentBlocks: ContentBlock[] = []
 
       for (let i = 0; i < batch.length; i++) {
         const frameData = await readFile(batch[i])
@@ -219,7 +212,8 @@ Use markdown formatting. Be specific about what you observed in each screenshot.
         })
         contentBlocks.push({
           type: 'image',
-          source: { type: 'base64', media_type: 'image/jpeg', data: b64 },
+          mediaType: 'image/jpeg',
+          base64Data: b64,
         })
       }
 
@@ -232,25 +226,20 @@ This is batch ${b + 1}/${batches.length} of screenshots (frames ${frameOffset + 
 Describe what you observe in these screenshots: what pages/screens are shown, what the user is doing, any signs of confusion or delight, UI issues, and notable interactions. Be specific and reference screenshot numbers.`,
       })
 
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: contentBlocks }],
-        temperature: 0.3,
-      }, { timeout: 300000 })
+      const response = await chat(
+        [{ role: 'user', content: contentBlocks }],
+        { maxTokens: 2048, temperature: 0.3, timeoutMs: 300000 }
+      )
 
-      const text = response.content[0]
-      if (text && text.type === 'text') {
-        batchAnalyses.push(`### Batch ${b + 1} (Screenshots ${frameOffset + 1}-${frameOffset + batch.length}, ~${frameOffset * 3}s-${(frameOffset + batch.length) * 3}s)\n${text.text}`)
+      if (response.text) {
+        batchAnalyses.push(`### Batch ${b + 1} (Screenshots ${frameOffset + 1}-${frameOffset + batch.length}, ~${frameOffset * 3}s-${(frameOffset + batch.length) * 3}s)\n${response.text}`)
       }
       frameOffset += batch.length
     }
 
     // Merge batch analyses into final report
-    const mergeResponse = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      messages: [{
+    const mergeResponse = await chat(
+      [{
         role: 'user',
         content: `${contextText}
 
@@ -270,11 +259,10 @@ Now synthesize all observations into a single cohesive analysis:
 
 Use markdown formatting. Be specific and reference timestamps.`,
       }],
-      temperature: 0.3,
-    }, { timeout: 300000 })
+      { maxTokens: 4096, temperature: 0.3, timeoutMs: 300000 }
+    )
 
-    const mergeText = mergeResponse.content[0]
-    return (mergeText && mergeText.type === 'text') ? mergeText.text : 'Analysis produced no output.'
+    return mergeResponse.text || 'Analysis produced no output.'
   } finally {
     await cleanupFiles(tempFiles)
   }
@@ -355,13 +343,10 @@ SEVERITY must be one of: CRITICAL, MAJOR, MINOR
 - **P2** (next sprint): ...
 - **P3** (backlog): ...`
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.5,
-  }, { timeout: 300000 })
+  const response = await chat(
+    [{ role: 'user', content: prompt }],
+    { maxTokens: 4096, temperature: 0.5, timeoutMs: 300000 }
+  )
 
-  const text = response.content[0]
-  return (text && text.type === 'text') ? text.text : 'Aggregate report generation produced no output.'
+  return response.text || 'Aggregate report generation produced no output.'
 }

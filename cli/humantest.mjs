@@ -130,12 +130,40 @@ async function init() {
     dbUrl = await ask('MySQL connection URL', 'mysql://user:password@localhost:3306/humantest')
   }
 
-  // 3. Anthropic API Key
-  const anthropicKey = await ask('Anthropic API Key (required for AI reports)')
-  if (!anthropicKey) {
-    console.log('\n  Warning: No API key provided. Report generation will not work.')
-    console.log('  You can add ANTHROPIC_API_KEY to .env later.\n')
+  // 3. AI Provider
+  const aiProvider = await askChoice('AI Provider:', [
+    { label: 'Anthropic (Claude)', desc: 'recommended', value: 'anthropic' },
+    { label: 'OpenAI (GPT-4o)', desc: 'OpenAI official API', value: 'openai' },
+    { label: 'OpenAI-compatible', desc: 'DeepSeek, Ollama, etc.', value: 'openai-compat' },
+  ])
+
+  let aiApiKey = ''
+  let aiBaseUrl = ''
+  let aiModel = ''
+
+  if (aiProvider === 'anthropic') {
+    aiApiKey = await ask('Anthropic API Key (required for AI reports)')
+    if (!aiApiKey) {
+      console.log('\n  Warning: No API key provided. Report generation will not work.')
+      console.log('  You can add AI_API_KEY to .env later.\n')
+    }
+  } else if (aiProvider === 'openai') {
+    aiApiKey = await ask('OpenAI API Key (required for AI reports)')
+    if (!aiApiKey) {
+      console.log('\n  Warning: No API key provided. Report generation will not work.')
+      console.log('  You can add AI_API_KEY to .env later.\n')
+    }
+  } else {
+    // openai-compat
+    aiApiKey = await ask('API Key')
+    aiBaseUrl = await ask('Base URL (e.g. https://api.deepseek.com/v1)')
+    aiModel = await ask('Model name (e.g. deepseek-chat)')
+    if (!aiApiKey || !aiBaseUrl) {
+      console.log('\n  Warning: Incomplete config. You can update .env later.\n')
+    }
   }
+
+  const providerValue = aiProvider === 'openai-compat' ? 'openai' : aiProvider
 
   // 4. Port
   const port = await ask('Port', '3000')
@@ -168,7 +196,14 @@ async function init() {
     `PORT=${port}`,
   ]
 
-  if (anthropicKey) envLines.push(`ANTHROPIC_API_KEY="${anthropicKey}"`)
+  if (aiApiKey) {
+    envLines.push(`AI_PROVIDER="${providerValue}"`)
+    envLines.push(`AI_API_KEY="${aiApiKey}"`)
+    // Backward compat: also set ANTHROPIC_API_KEY for existing code paths
+    if (providerValue === 'anthropic') envLines.push(`ANTHROPIC_API_KEY="${aiApiKey}"`)
+    if (aiBaseUrl) envLines.push(`AI_BASE_URL="${aiBaseUrl}"`)
+    if (aiModel) envLines.push(`AI_MODEL="${aiModel}"`)
+  }
   if (smtpHost) {
     envLines.push(`SMTP_HOST="${smtpHost}"`)
     envLines.push(`SMTP_PORT=${smtpPort}`)

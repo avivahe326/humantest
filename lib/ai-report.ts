@@ -1,13 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { chat } from '@/lib/ai-client'
 import { prisma } from '@/lib/prisma'
 import { sendWebhook } from '@/lib/webhook'
 import { analyzeMediaForFeedback, generateAggregateReport } from '@/lib/gemini'
 import { runCodeFixAnalysis } from '@/lib/code-fixer'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
-})
 
 interface RawData {
   firstImpression: string
@@ -59,27 +54,11 @@ ${fb.audioUrl ? `**Audio:** ${fb.audioUrl}` : ''}`
     .filter((n): n is number => n !== undefined)
   const avgNps = npsScores.length > 0 ? (npsScores.reduce((a, b) => a + b, 0) / npsScores.length).toFixed(1) : 'N/A'
 
-  const response = await anthropic.messages.create(
-    {
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: `You are a UX research analyst. Generate a structured usability report that is optimized for AI agents to parse and act on. Use markdown formatting with consistent structure. Cite specific testers by name.
-
-IMPORTANT: Follow this exact output format so AI agents can reliably parse the report:
-
-1. Start with a metadata block in a markdown table (product, URL, testers, avg NPS, date)
-2. Use exact section headers as specified
-3. For every issue, use this format:
-   - **[SEVERITY] Issue title** (SEVERITY must be one of: CRITICAL, MAJOR, MINOR)
-   - Evidence: what was observed and by whom
-   - Impact: how it affects users
-   - Recommendation: specific fix
-
-4. For recommendations, use priority tags: P0 (fix immediately), P1 (fix this sprint), P2 (next sprint), P3 (backlog)`,
-      messages: [
-        {
-          role: 'user',
-          content: `Generate a usability test report for "${task.title}" (${task.targetUrl}).
+  const response = await chat(
+    [
+      {
+        role: 'user',
+        content: `Generate a usability test report for "${task.title}" (${task.targetUrl}).
 ${task.focus ? `Focus area: ${task.focus}` : ''}
 
 **${task.feedbacks.length} testers participated. Average NPS: ${avgNps}/10.**
@@ -113,15 +92,30 @@ Generate the report with these exact section headers:
 
 ## Recommendations
 (Prioritized action items. Use P0/P1/P2/P3 tags. Each recommendation should reference the issue it addresses.)`,
-        },
-      ],
+      },
+    ],
+    {
+      system: `You are a UX research analyst. Generate a structured usability report that is optimized for AI agents to parse and act on. Use markdown formatting with consistent structure. Cite specific testers by name.
+
+IMPORTANT: Follow this exact output format so AI agents can reliably parse the report:
+
+1. Start with a metadata block in a markdown table (product, URL, testers, avg NPS, date)
+2. Use exact section headers as specified
+3. For every issue, use this format:
+   - **[SEVERITY] Issue title** (SEVERITY must be one of: CRITICAL, MAJOR, MINOR)
+   - Evidence: what was observed and by whom
+   - Impact: how it affects users
+   - Recommendation: specific fix
+
+4. For recommendations, use priority tags: P0 (fix immediately), P1 (fix this sprint), P2 (next sprint), P3 (backlog)`,
+      maxTokens: 4096,
       temperature: 0.5,
-    },
-    { timeout: timeoutMs, maxRetries: 0 }
+      timeoutMs,
+      maxRetries: 0,
+    }
   )
 
-  const content = response.content[0]
-  return (content && content.type === 'text') ? content.text : 'Report generation failed.'
+  return response.text || 'Report generation failed.'
 }
 
 /**

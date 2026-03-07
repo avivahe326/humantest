@@ -1,9 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
-})
+import { chat } from '@/lib/ai-client'
 
 export interface TestStep {
   id: string
@@ -25,30 +20,25 @@ export async function generateTestPlan(
 ): Promise<TestPlan> {
   const minutes = estimatedMinutes || 10
 
-  const response = await anthropic.messages.create(
+  const response = await chat(
+    [
+      {
+        role: 'user',
+        content: `Generate a structured usability test plan for ${url}.${focus ? ` Focus: ${focus}.` : ''} Duration: ~${minutes} min. Return JSON: {"steps": [{"id": "step_1", "instruction": "...", "type": "open_text"}, ...], "nps": true, "estimatedMinutes": ${minutes}}. Steps should be specific actions a tester should take on the product. Generate 3-7 steps depending on complexity. Respond with JSON only.`,
+      },
+    ],
     {
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
       system: 'You are a UX research expert. Generate structured usability test plans. Always respond with valid JSON only, no markdown wrapping.',
-      messages: [
-        {
-          role: 'user',
-          content: `Generate a structured usability test plan for ${url}.${focus ? ` Focus: ${focus}.` : ''} Duration: ~${minutes} min. Return JSON: {"steps": [{"id": "step_1", "instruction": "...", "type": "open_text"}, ...], "nps": true, "estimatedMinutes": ${minutes}}. Steps should be specific actions a tester should take on the product. Generate 3-7 steps depending on complexity. Respond with JSON only.`,
-        },
-      ],
+      maxTokens: 1024,
       temperature: 0.7,
-    },
-    { timeout: timeoutMs, maxRetries: 0 }
+      timeoutMs,
+      maxRetries: 0,
+    }
   )
-
-  const content = response.content[0]
-  if (!content || content.type !== 'text') {
-    return defaultTestPlan(minutes)
-  }
 
   try {
     // Strip potential markdown code fences
-    const jsonStr = content.text.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim()
+    const jsonStr = response.text.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim()
     const parsed = JSON.parse(jsonStr) as TestPlan
     if (!parsed.steps || !Array.isArray(parsed.steps) || parsed.steps.length === 0) {
       return defaultTestPlan(minutes)
