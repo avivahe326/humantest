@@ -320,7 +320,7 @@ function start() {
   console.log(`  Starting human_test() on port ${port}...`)
 
   if (useStandalone) {
-    run(`pm2 start "${standaloneServer}" --name "${PM2_NAME}" --env PORT=${port} --env HOSTNAME=0.0.0.0 --env NODE_ENV=production`, { cwd: appDir })
+    run(`PORT=${port} HOSTNAME=0.0.0.0 NODE_ENV=production pm2 start "${standaloneServer}" --name "${PM2_NAME}"`, { cwd: appDir })
   } else {
     run(`pm2 start npm --name "${PM2_NAME}" -- start -- -p ${port}`, { cwd: appDir })
   }
