@@ -1,4 +1,5 @@
 import { chat } from '@/lib/ai-client'
+import { getLanguageInstruction } from '@/lib/ai-locale'
 
 export interface TestStep {
   id: string
@@ -16,7 +17,8 @@ export async function generateTestPlan(
   url: string,
   focus?: string,
   estimatedMinutes?: number,
-  timeoutMs: number = 30000
+  timeoutMs: number = 30000,
+  locale?: string,
 ): Promise<TestPlan> {
   const minutes = estimatedMinutes || 10
 
@@ -28,7 +30,7 @@ export async function generateTestPlan(
       },
     ],
     {
-      system: 'You are a UX research expert. Generate structured usability test plans. Always respond with valid JSON only, no markdown wrapping.',
+      system: 'You are a UX research expert. Generate structured usability test plans. Always respond with valid JSON only, no markdown wrapping.' + getLanguageInstruction(locale),
       maxTokens: 1024,
       temperature: 0.7,
       timeoutMs,
@@ -41,7 +43,7 @@ export async function generateTestPlan(
     const jsonStr = response.text.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim()
     const parsed = JSON.parse(jsonStr) as TestPlan
     if (!parsed.steps || !Array.isArray(parsed.steps) || parsed.steps.length === 0) {
-      return defaultTestPlan(minutes)
+      return defaultTestPlan(minutes, locale)
     }
     return parsed
   } catch {
@@ -49,7 +51,19 @@ export async function generateTestPlan(
   }
 }
 
-function defaultTestPlan(minutes: number): TestPlan {
+function defaultTestPlan(minutes: number, locale?: string): TestPlan {
+  if (locale === 'zh') {
+    return {
+      steps: [
+        { id: 'step_1', instruction: '打开产品，描述你的第一印象', type: 'open_text' },
+        { id: 'step_2', instruction: '浏览主要功能', type: 'open_text' },
+        { id: 'step_3', instruction: '尝试完成主要操作或任务', type: 'open_text' },
+        { id: 'step_4', instruction: '记录任何令人困惑或意外的地方', type: 'open_text' },
+      ],
+      nps: true,
+      estimatedMinutes: minutes,
+    }
+  }
   return {
     steps: [
       { id: 'step_1', instruction: 'Open the product and describe your first impression', type: 'open_text' },

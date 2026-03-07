@@ -24,7 +24,7 @@ export default function CreateTaskPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [error, setError] = useState('')
   const [steps, setSteps] = useState<TestStep[]>([])
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
 
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
@@ -49,7 +49,7 @@ export default function CreateTaskPage() {
       const res = await fetch('/api/ai/generate-test-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, focus, estimatedMinutes: estimatedMinutes || 10 }),
+        body: JSON.stringify({ url, focus, estimatedMinutes: estimatedMinutes || 10, locale }),
       })
       if (!res.ok) throw new Error('Failed to generate plan')
       const plan = await res.json()
@@ -83,6 +83,7 @@ export default function CreateTaskPage() {
           requirements: steps.length > 0 ? { steps, nps: true, estimatedMinutes: estimatedMinutes || 10 } : undefined,
           repoUrl: repoUrl || undefined,
           repoBranch: repoBranch || undefined,
+          locale,
         }),
       })
 

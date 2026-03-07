@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     let requirements = data.requirements
     if (!requirements) {
       try {
-        requirements = await generateTestPlan(data.url, data.focus, data.estimatedMinutes)
+        requirements = await generateTestPlan(data.url, data.focus, data.estimatedMinutes, undefined, data.locale)
       } catch {
         // Fallback: task created without auto-generated plan
       }
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
         requirements: requirements ?? undefined,
         maxTesters,
         estimatedMinutes: data.estimatedMinutes ?? 10,
+        locale: data.locale,
         repoUrl: data.repoUrl,
         repoBranch: data.repoBranch,
         creatorId: user!.id,

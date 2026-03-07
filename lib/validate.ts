@@ -30,6 +30,7 @@ export const createTaskSchema = z.object({
   webhookUrl: z.url().optional(),
   repoUrl: z.string().max(2000).optional(),
   repoBranch: z.string().max(200).optional(),
+  locale: z.enum(['en', 'zh']).optional(),
 })
 
 const recordingUrlSchema = z.string().refine(

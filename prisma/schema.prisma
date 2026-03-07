@@ -38,6 +38,7 @@ model Task {
   repoBranch       String?    @db.VarChar(200)
   codeFixStatus    String?    @db.VarChar(20)
   codeFixPrUrl     String?    @db.VarChar(2000)
+  locale           String?    @db.VarChar(5)
   claimDeadline    DateTime?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt

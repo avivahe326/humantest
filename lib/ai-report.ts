@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { sendWebhook } from '@/lib/webhook'
 import { analyzeMediaForFeedback, generateAggregateReport } from '@/lib/gemini'
 import { runCodeFixAnalysis } from '@/lib/code-fixer'
+import { getLanguageInstruction } from '@/lib/ai-locale'
 
 interface RawData {
   firstImpression: string
@@ -107,7 +108,7 @@ IMPORTANT: Follow this exact output format so AI agents can reliably parse the r
    - Impact: how it affects users
    - Recommendation: specific fix
 
-4. For recommendations, use priority tags: P0 (fix immediately), P1 (fix this sprint), P2 (next sprint), P3 (backlog)`,
+4. For recommendations, use priority tags: P0 (fix immediately), P1 (fix this sprint), P2 (next sprint), P3 (backlog)` + getLanguageInstruction(task.locale),
       maxTokens: 4096,
       temperature: 0.5,
       timeoutMs,
@@ -169,7 +170,7 @@ export async function generateReport(taskId: string): Promise<string> {
   const analysisResults = await Promise.allSettled(
     feedbacksWithMedia.map(async (feedback) => {
       try {
-        const analysis = await analyzeMediaForFeedback(feedback, task)
+        const analysis = await analyzeMediaForFeedback(feedback, task, task.locale)
         await prisma.feedback.update({
           where: { id: feedback.id },
           data: { mediaAnalysis: analysis, mediaAnalysisStatus: 'COMPLETED' },
@@ -211,7 +212,7 @@ export async function generateReport(taskId: string): Promise<string> {
     }
   })
 
-  const report = await generateAggregateReport(task, feedbackAnalyses)
+  const report = await generateAggregateReport(task, feedbackAnalyses, task.locale)
 
   await prisma.task.update({
     where: { id: taskId },

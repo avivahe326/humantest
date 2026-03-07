@@ -1,6 +1,7 @@
 import { chat } from '@/lib/ai-client'
 import { prisma } from '@/lib/prisma'
 import { sendWebhook } from '@/lib/webhook'
+import { getLanguageInstruction } from '@/lib/ai-locale'
 import { mkdtemp, readdir, readFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -157,6 +158,7 @@ async function generateCodeSuggestions(
   issues: ReportIssue[],
   files: { path: string; content: string }[],
   targetUrl: string,
+  locale?: string | null,
 ): Promise<string> {
   const fileContents = files.map(f => {
     // Truncate very long files to first 500 lines
@@ -208,7 +210,7 @@ Output format — for each fixable issue:
 
 **Explanation:** Brief description of why this fix addresses the issue.
 
-If an issue cannot be fixed in code (e.g., requires new assets, infrastructure changes, or policy decisions), say so briefly and skip it.`,
+If an issue cannot be fixed in code (e.g., requires new assets, infrastructure changes, or policy decisions), say so briefly and skip it.` + getLanguageInstruction(locale),
       maxTokens: 8192,
       temperature: 0.3,
       timeoutMs: 300000,
@@ -409,6 +411,7 @@ export async function runCodeFixAnalysis(taskId: string): Promise<void> {
         repoBranch: true,
         targetUrl: true,
         webhookUrl: true,
+        locale: true,
       },
     })
 
@@ -463,7 +466,7 @@ export async function runCodeFixAnalysis(taskId: string): Promise<void> {
 
     // 4. Generate code suggestions via Claude
     console.log(`[CodeFix ${taskId}] Generating code suggestions...`)
-    const suggestions = await generateCodeSuggestions(issues, relevantFiles, task.targetUrl)
+    const suggestions = await generateCodeSuggestions(issues, relevantFiles, task.targetUrl, task.locale)
 
     // 5. Try Mode 2: create PR
     let prUrl: string | null = null

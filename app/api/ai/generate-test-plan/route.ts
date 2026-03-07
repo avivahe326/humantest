@@ -9,13 +9,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { url, focus, estimatedMinutes } = body
+    const { url, focus, estimatedMinutes, locale } = body
 
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 })
     }
 
-    const plan = await generateTestPlan(url, focus, estimatedMinutes)
+    const plan = await generateTestPlan(url, focus, estimatedMinutes, undefined, locale)
     return NextResponse.json(plan)
   } catch (err) {
     if (err instanceof AITimeoutError) {

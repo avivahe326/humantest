@@ -37,12 +37,17 @@ export async function POST(request: NextRequest) {
       return withCors(NextResponse.json({ error: 'Invalid repo URL. Only GitHub and Gitee HTTPS URLs are supported.' }, { status: 400 }))
     }
 
+    // Derive locale from body or Accept-Language header
+    const locale = data.locale || (
+      /^zh/i.test(request.headers.get('accept-language') || '') ? 'zh' : undefined
+    )
+
     const maxTesters = data.maxTesters ?? 5
 
     let requirements = data.requirements
     if (!requirements) {
       try {
-        requirements = await generateTestPlan(data.url, data.focus, data.estimatedMinutes)
+        requirements = await generateTestPlan(data.url, data.focus, data.estimatedMinutes, undefined, locale)
       } catch {
         // Fallback: task created without auto-generated plan
       }
@@ -67,6 +72,7 @@ export async function POST(request: NextRequest) {
         requirements: requirements ?? undefined,
         maxTesters,
         estimatedMinutes: data.estimatedMinutes ?? 10,
+        locale,
         webhookUrl: data.webhookUrl,
         repoUrl: data.repoUrl,
         repoBranch: data.repoBranch,

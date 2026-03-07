@@ -1,4 +1,5 @@
 import { chat, type ContentBlock } from '@/lib/ai-client'
+import { getLanguageInstruction } from '@/lib/ai-locale'
 import { writeFile, unlink, mkdtemp, readFile, readdir } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -103,6 +104,7 @@ async function cleanupFiles(paths: string[]) {
 export async function analyzeMediaForFeedback(
   feedback: FeedbackForAnalysis,
   task: TaskForAnalysis,
+  locale?: string | null,
 ): Promise<string> {
   const raw = feedback.rawData as RawData | null
   const tempFiles: string[] = []
@@ -182,7 +184,7 @@ Analyze the screenshots carefully. They are in chronological order (one every 3 
 5. **Behavioral Observations** — navigation patterns, page transitions, areas of focus
 6. **Tester Verdict** — overall assessment based on screenshots + written feedback
 
-Use markdown formatting. Be specific about what you observed in each screenshot.`,
+Use markdown formatting. Be specific about what you observed in each screenshot.${getLanguageInstruction(locale)}`,
       })
 
       const response = await chat(
@@ -223,7 +225,7 @@ Use markdown formatting. Be specific about what you observed in each screenshot.
 
 This is batch ${b + 1}/${batches.length} of screenshots (frames ${frameOffset + 1}-${frameOffset + batch.length} of ${totalFrames} total, one every 3 seconds).
 
-Describe what you observe in these screenshots: what pages/screens are shown, what the user is doing, any signs of confusion or delight, UI issues, and notable interactions. Be specific and reference screenshot numbers.`,
+Describe what you observe in these screenshots: what pages/screens are shown, what the user is doing, any signs of confusion or delight, UI issues, and notable interactions. Be specific and reference screenshot numbers.${getLanguageInstruction(locale)}`,
       })
 
       const response = await chat(
@@ -257,7 +259,7 @@ Now synthesize all observations into a single cohesive analysis:
 5. **Behavioral Observations** — navigation patterns, page transitions, areas of focus
 6. **Tester Verdict** — overall assessment based on screenshots + written feedback
 
-Use markdown formatting. Be specific and reference timestamps.`,
+Use markdown formatting. Be specific and reference timestamps.${getLanguageInstruction(locale)}`,
       }],
       { maxTokens: 4096, temperature: 0.3, timeoutMs: 300000 }
     )
@@ -278,6 +280,7 @@ interface FeedbackAnalysisInput {
 export async function generateAggregateReport(
   task: TaskForAnalysis,
   feedbackAnalyses: FeedbackAnalysisInput[],
+  locale?: string | null,
 ): Promise<string> {
   const testerSections = feedbackAnalyses
     .map((fb, i) => {
@@ -341,7 +344,7 @@ SEVERITY must be one of: CRITICAL, MAJOR, MINOR
 - **P0** (fix immediately): ...
 - **P1** (fix this sprint): ...
 - **P2** (next sprint): ...
-- **P3** (backlog): ...`
+- **P3** (backlog): ...` + getLanguageInstruction(locale)
 
   const response = await chat(
     [{ role: 'user', content: prompt }],
