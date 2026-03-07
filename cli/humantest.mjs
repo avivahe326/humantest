@@ -222,6 +222,12 @@ async function init() {
     schema = schema.replace(/@db\.\w+(\(\d+\))?/g, '')
     writeFileSync(schemaPath, schema)
     mkdirSync(join(installDir, 'prisma', 'data'), { recursive: true })
+
+    // Remove standalone output for local mode (not needed, avoids cp errors)
+    const nextConfigPath = join(installDir, 'next.config.ts')
+    let nextConfig = readFileSync(nextConfigPath, 'utf-8')
+    nextConfig = nextConfig.replace(/\s*output:\s*'standalone',?\n?/, '\n')
+    writeFileSync(nextConfigPath, nextConfig)
   }
 
   // ─── Install dependencies ───
@@ -339,6 +345,29 @@ function update() {
 
   console.log('  Installing dependencies...')
   run('npm install', { cwd: appDir })
+
+  // Re-apply local mode patches after pull (git may overwrite them)
+  try {
+    const envContent = readFileSync(join(appDir, '.env'), 'utf-8')
+    const isLocal = envContent.includes('file:./data/humantest.db') || envContent.includes('file:./data/')
+    if (isLocal) {
+      // Ensure Prisma uses SQLite
+      const schemaPath = join(appDir, 'prisma', 'schema.prisma')
+      let schema = readFileSync(schemaPath, 'utf-8')
+      if (schema.includes('provider = "mysql"')) {
+        schema = schema.replace('provider = "mysql"', 'provider = "sqlite"')
+        schema = schema.replace(/@db\.\w+(\(\d+\))?/g, '')
+        writeFileSync(schemaPath, schema)
+      }
+      // Remove standalone output
+      const nextConfigPath = join(appDir, 'next.config.ts')
+      let nextConfig = readFileSync(nextConfigPath, 'utf-8')
+      if (nextConfig.includes("output: 'standalone'")) {
+        nextConfig = nextConfig.replace(/\s*output:\s*'standalone',?\n?/, '\n')
+        writeFileSync(nextConfigPath, nextConfig)
+      }
+    }
+  } catch {}
 
   console.log('  Updating database...')
   run('npx prisma db push', { cwd: appDir, ignoreError: true })
