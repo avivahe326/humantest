@@ -12,7 +12,6 @@ export async function GET(
     select: {
       title: true,
       targetUrl: true,
-      rewardPerTester: true,
       requirements: true,
     },
   })

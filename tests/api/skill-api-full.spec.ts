@@ -7,8 +7,9 @@ async function registerAndGetApiKey(
   request: ReturnType<typeof playwrightRequest.newContext> extends Promise<infer R> ? R : never,
 ) {
   const user = await registerUser(request)
-  const historyRes = await request.get('/api/credits/history')
-  const { apiKey } = await historyRes.json()
+  // Fetch API key via regenerate-key GET endpoint
+  const keyRes = await request.get('/api/auth/regenerate-key')
+  const { apiKey } = await keyRes.json()
   return { user, apiKey }
 }
 
@@ -32,7 +33,6 @@ test.describe('Skill API - Full Flow @P0 @API', () => {
         url: 'https://example.com',
         title: 'Skill API Test Task',
         maxTesters: 2,
-        rewardPerTester: 5,
       },
     })
 
@@ -69,23 +69,6 @@ test.describe('Skill API - Full Flow @P0 @API', () => {
 })
 
 test.describe('Skill API - Error Cases @P1 @API', () => {
-  test('create task with insufficient credits returns 402', async ({ request }) => {
-    const { apiKey } = await registerAndGetApiKey(request)
-
-    const res = await request.post('/api/skill/human-test', {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      data: {
-        url: 'https://example.com',
-        maxTesters: 50,
-        rewardPerTester: 100,
-      },
-    })
-
-    expect(res.status()).toBe(402)
-    const body = await res.json()
-    expect(body.error).toContain('Insufficient')
-  })
-
   test('create task with invalid URL returns 400', async ({ request }) => {
     const { apiKey } = await registerAndGetApiKey(request)
 
@@ -113,7 +96,7 @@ test.describe('Skill API - Error Cases @P1 @API', () => {
 
     const createRes = await request.post('/api/skill/human-test', {
       headers: { Authorization: `Bearer ${apiKeyA}` },
-      data: { url: 'https://example.com', maxTesters: 1, rewardPerTester: 5 },
+      data: { url: 'https://example.com', maxTesters: 1 },
     })
     const { taskId } = await createRes.json()
 

@@ -24,7 +24,6 @@ export function buildTask(overrides: Record<string, unknown> = {}) {
     description: faker.lorem.sentence(),
     focus: faker.lorem.words(3),
     maxTesters: 5,
-    rewardPerTester: 20,
     estimatedMinutes: 10,
     ...overrides,
   };

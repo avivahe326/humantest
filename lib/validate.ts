@@ -26,7 +26,6 @@ export const createTaskSchema = z.object({
   focus: z.string().max(2000).optional(),
   requirements: z.any().optional(),
   maxTesters: z.number().int().min(1).max(50).optional(),
-  rewardPerTester: z.number().int().min(1).max(1000).optional(),
   estimatedMinutes: z.number().int().min(1).max(120).optional(),
   webhookUrl: z.url().optional(),
   repoUrl: z.string().max(2000).optional(),

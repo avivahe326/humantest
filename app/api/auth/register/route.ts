@@ -46,10 +46,7 @@ export async function POST(request: NextRequest) {
 
       const user = await prisma.$transaction(async (tx) => {
         const newUser = await tx.user.create({
-          data: { name, email, password: hashedPassword, apiKey, credits: 100 },
-        })
-        await tx.creditTransaction.create({
-          data: { userId: newUser.id, amount: 100, type: 'SIGNUP_BONUS' },
+          data: { name, email, password: hashedPassword, apiKey },
         })
         await tx.emailVerificationCode.deleteMany({ where: { email } })
         return newUser
@@ -73,14 +70,8 @@ export async function POST(request: NextRequest) {
       const hashedPassword = await bcrypt.hash(password, 10)
       const apiKey = crypto.randomBytes(32).toString('hex')
 
-      const user = await prisma.$transaction(async (tx) => {
-        const newUser = await tx.user.create({
-          data: { name, email, password: hashedPassword, apiKey, credits: 100 },
-        })
-        await tx.creditTransaction.create({
-          data: { userId: newUser.id, amount: 100, type: 'SIGNUP_BONUS' },
-        })
-        return newUser
+      const user = await prisma.user.create({
+        data: { name, email, password: hashedPassword, apiKey },
       })
 
       return NextResponse.json({ success: true, userId: user.id })

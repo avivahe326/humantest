@@ -108,7 +108,7 @@ test.describe('Task Detail Page @P1 @E2E', () => {
 
   test('setup: create task', async ({ request }) => {
     await registerUser(request)
-    const taskData = buildTask({ maxTesters: 3, rewardPerTester: 10 })
+    const taskData = buildTask({ maxTesters: 3 })
     const res = await request.post('/api/tasks/create', { data: taskData })
     expect(res.status()).toBe(200)
     const body = await res.json()

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/require-auth'
 import { submitFeedbackSchema } from '@/lib/validate'
-import { awardCredits, getBalance } from '@/lib/credits'
 import { prisma } from '@/lib/prisma'
 import { startReportGeneration } from '@/lib/ai-report'
 
@@ -86,21 +85,12 @@ export async function POST(
       return false
     })
 
-    // Award credits immediately
-    await awardCredits(user!.id, task.rewardPerTester, 'TASK_REWARD', id)
-
     // Generate report only if this transaction was the one to mark COMPLETED
     if (isLastSubmission) {
       startReportGeneration(id)  // fire-and-forget, no await
     }
 
-    const newBalance = await getBalance(user!.id)
-
-    return NextResponse.json({
-      success: true,
-      creditsEarned: task.rewardPerTester,
-      newBalance,
-    })
+    return NextResponse.json({ success: true })
   } catch (err) {
     console.error('Submit error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

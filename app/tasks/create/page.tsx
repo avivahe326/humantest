@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,6 @@ export default function CreateTaskPage() {
   const [loading, setLoading] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [error, setError] = useState('')
-  const [credits, setCredits] = useState<number>(0)
   const [steps, setSteps] = useState<TestStep[]>([])
   const { t } = useTranslation()
 
@@ -31,22 +30,10 @@ export default function CreateTaskPage() {
   const [title, setTitle] = useState('')
   const [focus, setFocus] = useState('')
   const [estimatedMinutes, setEstimatedMinutes] = useState<number | ''>(10)
-  const [rewardPerTester, setRewardPerTester] = useState<number | ''>(20)
   const [maxTesters, setMaxTesters] = useState<number | ''>(5)
   const [repoUrl, setRepoUrl] = useState('')
   const [repoBranch, setRepoBranch] = useState('')
   const [repoOpen, setRepoOpen] = useState(false)
-
-  const totalCost = (rewardPerTester || 0) * (maxTesters || 0)
-
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetch('/api/credits/balance')
-        .then(res => res.json())
-        .then(data => setCredits(data.credits))
-        .catch(() => {})
-    }
-  }, [session?.user?.id])
 
   if (status === 'loading') return null
   if (!session) {
@@ -92,7 +79,6 @@ export default function CreateTaskPage() {
           title: title || undefined,
           focus: focus || undefined,
           estimatedMinutes: estimatedMinutes || 10,
-          rewardPerTester: rewardPerTester || 20,
           maxTesters: maxTesters || 5,
           requirements: steps.length > 0 ? { steps, nps: true, estimatedMinutes: estimatedMinutes || 10 } : undefined,
           repoUrl: repoUrl || undefined,
@@ -152,7 +138,7 @@ export default function CreateTaskPage() {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="minutes">{t('createTask.estMinutes')}</Label>
             <Input
@@ -162,17 +148,6 @@ export default function CreateTaskPage() {
               max={120}
               value={estimatedMinutes}
               onChange={e => setEstimatedMinutes(e.target.value === '' ? '' : Number(e.target.value))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="reward">{t('createTask.creditsPerTester')}</Label>
-            <Input
-              id="reward"
-              type="number"
-              min={1}
-              max={1000}
-              value={rewardPerTester}
-              onChange={e => setRewardPerTester(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </div>
           <div className="space-y-2">
@@ -244,23 +219,9 @@ export default function CreateTaskPage() {
           </Card>
         )}
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <span>{t('createTask.totalCost')} <strong>{totalCost} credits</strong></span>
-              <span className="text-sm text-muted-foreground">
-                {t('createTask.yourBalance', { count: credits })}
-                {credits < totalCost && (
-                  <span className="ml-2 text-red-500">{t('createTask.insufficient')}</span>
-                )}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
         {error && <p className="text-sm text-red-500">{error}</p>}
 
-        <Button type="submit" className="w-full" disabled={loading || credits < totalCost}>
+        <Button type="submit" className="w-full" disabled={loading}>
           {loading ? t('createTask.creating') : t('createTask.launchTest')}
         </Button>
       </form>

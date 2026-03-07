@@ -41,7 +41,6 @@ interface TaskDetailProps {
     focus: string | null
     requirements: Record<string, unknown> | null
     maxTesters: number
-    rewardPerTester: number
     estimatedMinutes: number
     status: string
     report: string | null
@@ -324,7 +323,6 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Badge variant="secondary">{t('tasks.credits', { count: task.rewardPerTester })}</Badge>
         <Badge variant="outline">{t('tasks.estMinutes', { count: task.estimatedMinutes })}</Badge>
         <Badge variant={task.spotsRemaining > 0 ? 'default' : 'destructive'}>
           {task.spotsRemaining > 0 ? t('taskDetail.spotsLeft', { remaining: task.spotsRemaining, max: task.maxTesters }) : t('tasks.full')}

@@ -11,7 +11,6 @@ interface TaskItem {
   title: string
   targetUrl: string
   focus: string | null
-  rewardPerTester: number
   estimatedMinutes: number
   maxTesters: number
   claimsCount: number
@@ -60,7 +59,6 @@ export function TasksListClient({ tasks, page, totalPages }: TasksListClientProp
                       <p className="mb-3 text-sm text-muted-foreground line-clamp-2">{task.focus}</p>
                     )}
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">{t('tasks.credits', { count: task.rewardPerTester })}</Badge>
                       <Badge variant="outline">{t('tasks.estMinutes', { count: task.estimatedMinutes })}</Badge>
                       <Badge variant={spotsRemaining > 0 ? 'default' : 'destructive'}>
                         {spotsRemaining > 0 ? t('tasks.spotsLeft', { count: spotsRemaining }) : t('tasks.full')}

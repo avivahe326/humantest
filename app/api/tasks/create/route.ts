@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/require-auth'
 import { createTaskSchema, isSafeTargetUrl, isValidRepoUrl } from '@/lib/validate'
-import { spendCredits, getBalance } from '@/lib/credits'
 import { generateTestPlan } from '@/lib/ai-test-plan'
 import { prisma } from '@/lib/prisma'
 import { RateLimiter, rateLimitResponse } from '@/lib/rate-limit'
@@ -34,15 +33,6 @@ export async function POST(request: NextRequest) {
     }
 
     const maxTesters = data.maxTesters ?? 5
-    const rewardPerTester = data.rewardPerTester ?? 20
-    const totalCost = maxTesters * rewardPerTester
-
-    try {
-      await spendCredits(user!.id, totalCost, 'TASK_CREATION')
-    } catch {
-      const balance = await getBalance(user!.id)
-      return NextResponse.json({ error: 'Insufficient credits', balance }, { status: 402 })
-    }
 
     let requirements = data.requirements
     if (!requirements) {
@@ -71,7 +61,6 @@ export async function POST(request: NextRequest) {
         focus: data.focus,
         requirements: requirements ?? undefined,
         maxTesters,
-        rewardPerTester,
         estimatedMinutes: data.estimatedMinutes ?? 10,
         repoUrl: data.repoUrl,
         repoBranch: data.repoBranch,

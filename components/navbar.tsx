@@ -2,35 +2,13 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from '@/lib/i18n'
 
 export function Navbar() {
   const { data: session, status } = useSession()
-  const [credits, setCredits] = useState<number | null>(null)
-  const pathname = usePathname()
   const { locale, setLocale, t } = useTranslation()
-
-  const fetchCredits = useCallback(() => {
-    if (!session?.user?.id) return
-    fetch('/api/credits/balance')
-      .then(res => res.json())
-      .then(data => setCredits(data.credits))
-      .catch(() => {})
-  }, [session?.user?.id])
-
-  // Fetch on session change and route change
-  useEffect(() => { fetchCredits() }, [fetchCredits, pathname])
-
-  // Refetch when page becomes visible
-  useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') fetchCredits() }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [fetchCredits])
 
   return (
     <nav className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -68,14 +46,9 @@ export function Navbar() {
             {t('nav.langSwitch')}
           </button>
           {status === 'loading' ? null : session ? (
-            <>
-              {credits !== null && (
-                <span className="text-sm font-medium">{t('nav.credits', { count: credits })}</span>
-              )}
-              <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: '/' })}>
-                {t('nav.logOut')}
-              </Button>
-            </>
+            <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: '/' })}>
+              {t('nav.logOut')}
+            </Button>
           ) : (
             <>
               <Link href="/login">

@@ -12,7 +12,7 @@ interface MyTasksClientProps {
     id: string
     status: string
     claimedAt: string
-    task: { id: string; title: string; status: string; rewardPerTester: number }
+    task: { id: string; title: string; status: string }
   }[]
   createdTasks: {
     id: string
@@ -93,7 +93,6 @@ export function MyTasksClient({ claims, createdTasks }: MyTasksClientProps) {
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge variant="secondary">SUBMITTED</Badge>
-                    <span className="text-sm text-muted-foreground">+{claim.task.rewardPerTester} credits</span>
                   </div>
                 </CardContent>
               </Card>

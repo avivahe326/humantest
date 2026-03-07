@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireApiKey } from '@/lib/require-api-key'
 import { createTaskSchema, isSafeTargetUrl, isValidRepoUrl } from '@/lib/validate'
-import { spendCredits } from '@/lib/credits'
 import { generateTestPlan } from '@/lib/ai-test-plan'
 import { prisma } from '@/lib/prisma'
 import { withCors, corsOptionsResponse } from '@/lib/cors'
@@ -39,14 +38,6 @@ export async function POST(request: NextRequest) {
     }
 
     const maxTesters = data.maxTesters ?? 5
-    const rewardPerTester = data.rewardPerTester ?? 20
-    const totalCost = maxTesters * rewardPerTester
-
-    try {
-      await spendCredits(user!.id, totalCost, 'TASK_CREATION')
-    } catch {
-      return withCors(NextResponse.json({ error: 'Insufficient credits', balance: user!.credits }, { status: 402 }))
-    }
 
     let requirements = data.requirements
     if (!requirements) {
@@ -75,7 +66,6 @@ export async function POST(request: NextRequest) {
         focus: data.focus,
         requirements: requirements ?? undefined,
         maxTesters,
-        rewardPerTester,
         estimatedMinutes: data.estimatedMinutes ?? 10,
         webhookUrl: data.webhookUrl,
         repoUrl: data.repoUrl,

@@ -3,6 +3,18 @@ import crypto from 'crypto'
 import { requireAuth } from '@/lib/require-auth'
 import { prisma } from '@/lib/prisma'
 
+export async function GET() {
+  const { user, error } = await requireAuth()
+  if (error) return error
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user!.id },
+    select: { apiKey: true },
+  })
+
+  return NextResponse.json({ apiKey: dbUser?.apiKey ?? '' })
+}
+
 export async function POST() {
   const { user, error } = await requireAuth()
   if (error) return error

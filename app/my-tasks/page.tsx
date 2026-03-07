@@ -13,7 +13,7 @@ export default async function MyTasksPage() {
       where: { userId: session.user.id },
       include: {
         task: {
-          select: { id: true, title: true, status: true, rewardPerTester: true },
+          select: { id: true, title: true, status: true },
         },
       },
       orderBy: { claimedAt: 'desc' },

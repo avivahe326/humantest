@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/require-auth'
 import { prisma } from '@/lib/prisma'
-import { getBalance } from '@/lib/credits'
 import { startReportGeneration } from '@/lib/ai-report'
 
 export async function POST(
@@ -15,7 +14,7 @@ export async function POST(
   const regenerate = request.nextUrl.searchParams.get('regenerate') === '1'
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       // 1. Read task inside transaction
       const task = await tx.task.findUnique({ where: { id } })
 
@@ -37,12 +36,12 @@ export async function POST(
           where: { taskId: id },
           data: { mediaAnalysis: null, mediaAnalysisStatus: null },
         })
-        return { refundAmount: 0 }
+        return
       }
 
       // Retry path: COMPLETED but report failed previously — skip state changes
       if (task.status === 'COMPLETED' && task.report === null) {
-        return { refundAmount: 0 }
+        return
       }
 
       // 3. Count feedbacks inside transaction
@@ -62,21 +61,6 @@ export async function POST(
         where: { taskId: id, status: 'IN_PROGRESS' },
         data: { status: 'ABANDONED' },
       })
-
-      // 6. Calculate and execute refund inside transaction
-      const refundAmount = Math.max(0, task.rewardPerTester * (task.maxTesters - submittedCount))
-
-      if (refundAmount > 0) {
-        await tx.user.update({
-          where: { id: user!.id },
-          data: { credits: { increment: refundAmount } },
-        })
-        await tx.creditTransaction.create({
-          data: { userId: user!.id, amount: refundAmount, type: 'TASK_REFUND', taskId: id },
-        })
-      }
-
-      return { refundAmount }
     }, { timeout: 10000 })
 
     // Generate report outside transaction (AI API call is long-running)
@@ -90,12 +74,9 @@ export async function POST(
       const ageMs = Date.now() - currentTask.updatedAt.getTime()
       if (ageMs < 5 * 60 * 1000) {
         // Still fresh — don't start another run
-        const newBalance = await getBalance(user!.id)
         return NextResponse.json({
           error: 'Report is already being generated',
           reportStatus: 'GENERATING',
-          refunded: result.refundAmount,
-          newBalance,
         }, { status: 409 })
       }
       // Stale — reset to FAILED so startReportGeneration can re-acquire
@@ -107,12 +88,7 @@ export async function POST(
 
     startReportGeneration(id)  // fire-and-forget
 
-    const newBalance = await getBalance(user!.id)
-    return NextResponse.json({
-      started: true,
-      refunded: result.refundAmount,
-      newBalance,
-    })
+    return NextResponse.json({ started: true })
   } catch (err: any) {
     if (err.appCode === 'NOT_FOUND') {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })

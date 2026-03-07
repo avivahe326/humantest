@@ -13,12 +13,10 @@ model User {
   password     String
   name         String?
   apiKey       String             @unique
-  credits      Int                @default(100)
   createdAt    DateTime           @default(now())
   claims       TaskClaim[]
   tasks        Task[]
   feedbacks    Feedback[]
-  transactions CreditTransaction[]
 }
 
 model Task {
@@ -29,8 +27,6 @@ model Task {
   focus            String?    @db.Text
   requirements     Json?
   maxTesters       Int        @default(5)
-  rewardPerTester  Int        @default(20)
-  rewardType       String     @default("CREDITS")
   estimatedMinutes Int        @default(10)
   status           TaskStatus @default(OPEN)
   webhookUrl       String?    @db.VarChar(2000)
@@ -83,18 +79,6 @@ model Feedback {
   task                Task     @relation(fields: [taskId], references: [id])
   claim               TaskClaim @relation(fields: [claimId], references: [id])
   user                User     @relation(fields: [userId], references: [id])
-}
-
-model CreditTransaction {
-  id        String   @id @default(cuid())
-  userId    String
-  amount    Int
-  type      String
-  taskId    String?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-
-  @@index([userId, createdAt])
 }
 
 enum TaskStatus {

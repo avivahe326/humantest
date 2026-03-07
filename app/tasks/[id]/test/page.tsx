@@ -19,7 +19,6 @@ interface TestStep {
 interface TaskInfo {
   title: string
   targetUrl: string
-  rewardPerTester: number
   requirements: { steps: TestStep[] } | null
 }
 

@@ -20,7 +20,6 @@ export type TestUser = {
   email: string;
   name: string;
   apiKey: string;
-  credits: number;
   plainPassword: string;
   sessionCookie?: string;
 };
@@ -77,7 +76,6 @@ export async function registerUser(
     email: userData.email,
     name: userData.name as string,
     apiKey: '', // Will be fetched separately if needed
-    credits: 100,
     plainPassword: userData.password,
   };
 }

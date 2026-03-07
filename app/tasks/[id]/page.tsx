@@ -59,7 +59,6 @@ export default async function TaskDetailPage({
         focus: task.focus,
         requirements: task.requirements as Record<string, unknown> | null,
         maxTesters: task.maxTesters,
-        rewardPerTester: task.rewardPerTester,
         estimatedMinutes: task.estimatedMinutes,
         status: task.status,
         report: task.report,

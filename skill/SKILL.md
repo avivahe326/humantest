@@ -26,7 +26,7 @@ AI agents cannot judge human perception, emotion, or usability. This skill lets 
 
 ## Quick start
 
-You need an API key. Register at https://human-test.work/register to get one (free, 100 credits on signup).
+You need an API key. Register at https://human-test.work/register to get one (free).
 
 ### Create a test task
 
@@ -75,7 +75,6 @@ Response (when completed):
 | `title` | No | Auto from hostname | Task title |
 | `focus` | No | — | What testers should focus on |
 | `maxTesters` | No | 5 | Number of testers (1-50) |
-| `rewardPerTester` | No | 20 | Credits per tester |
 | `estimatedMinutes` | No | 10 | Expected test duration |
 | `webhookUrl` | No | — | HTTPS URL to receive the report on completion |
 | `repoUrl` | No | — | GitHub/Gitee repo URL for code-level fix suggestions |
@@ -96,12 +95,6 @@ If you provide a `webhookUrl`, the platform will POST the full report to that UR
   "completedAt": "2026-03-02T12:00:00Z"
 }
 ```
-
-## Credits
-
-- Signup: 100 free credits
-- Creating a task costs: `rewardPerTester × maxTesters` credits
-- Earn credits by testing other people's products (20 credits per test)
 
 ## Report format (structured for AI agents)
 

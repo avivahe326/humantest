@@ -51,7 +51,6 @@ test.describe('Task Info @P1 @API', () => {
     const body = await res.json()
     expect(body.title).toBeTruthy()
     expect(body.targetUrl).toBe(taskData.url)
-    expect(body.rewardPerTester).toBe(taskData.rewardPerTester)
     expect(body).toHaveProperty('requirements')
   })
 
@@ -64,9 +63,9 @@ test.describe('Task Info @P1 @API', () => {
 })
 
 test.describe('Task Cancel @P0 @API', () => {
-  test('creator can cancel OPEN task and receive refund', async ({ request }) => {
+  test('creator can cancel OPEN task', async ({ request }) => {
     await registerUser(request)
-    const taskData = buildTask({ maxTesters: 3, rewardPerTester: 10 })
+    const taskData = buildTask({ maxTesters: 3 })
     const createRes = await request.post('/api/tasks/create', { data: taskData })
     const { taskId } = await createRes.json()
 
@@ -74,8 +73,7 @@ test.describe('Task Cancel @P0 @API', () => {
     expect(cancelRes.status()).toBe(200)
 
     const body = await cancelRes.json()
-    expect(body.refunded).toBe(30) // 3 * 10, no submissions
-    expect(body.newBalance).toBeTruthy()
+    expect(body.cancelled).toBe(true)
   })
 
   test('cancel requires authentication', async ({ request }) => {
@@ -85,7 +83,7 @@ test.describe('Task Cancel @P0 @API', () => {
 
   test('cannot cancel already cancelled task', async ({ request }) => {
     await registerUser(request)
-    const taskData = buildTask({ maxTesters: 2, rewardPerTester: 5 })
+    const taskData = buildTask({ maxTesters: 2 })
     const createRes = await request.post('/api/tasks/create', { data: taskData })
     const { taskId } = await createRes.json()
 
@@ -101,7 +99,7 @@ test.describe('Task Cancel @P0 @API', () => {
   test('non-creator cannot cancel task', async ({ request }) => {
     // User A creates task
     await registerUser(request)
-    const taskData = buildTask({ maxTesters: 2, rewardPerTester: 5 })
+    const taskData = buildTask({ maxTesters: 2 })
     const createRes = await request.post('/api/tasks/create', { data: taskData })
     const { taskId } = await createRes.json()
 
@@ -124,7 +122,7 @@ test.describe('Submit Feedback @P0 @API', () => {
   test('full submit flow: create, claim, submit', async ({ request }) => {
     // User A creates task
     await registerUser(request)
-    const taskData = buildTask({ maxTesters: 5, rewardPerTester: 10 })
+    const taskData = buildTask({ maxTesters: 5 })
     const createRes = await request.post('/api/tasks/create', { data: taskData })
     expect(createRes.status()).toBe(200)
     const { taskId } = await createRes.json()
@@ -146,8 +144,6 @@ test.describe('Submit Feedback @P0 @API', () => {
 
     const body = await submitRes.json()
     expect(body.success).toBe(true)
-    expect(body.creditsEarned).toBe(10)
-    expect(typeof body.newBalance).toBe('number')
 
     // Cannot submit again
     const doubleSubmit = await userBContext.post(`/api/tasks/${taskId}/submit`, {
@@ -162,7 +158,7 @@ test.describe('Submit Feedback @P0 @API', () => {
 test.describe('Submit Feedback - Validation @P1 @API', () => {
   test('submit with invalid data returns 400', async ({ request }) => {
     await registerUser(request)
-    const taskData = buildTask({ maxTesters: 5, rewardPerTester: 10 })
+    const taskData = buildTask({ maxTesters: 5 })
     const createRes = await request.post('/api/tasks/create', { data: taskData })
     const { taskId } = await createRes.json()
 
@@ -190,7 +186,7 @@ test.describe('Submit Feedback - Validation @P1 @API', () => {
 test.describe('Generate Report @P0 @API', () => {
   test('generate report requires at least 1 submission', async ({ request }) => {
     await registerUser(request)
-    const taskData = buildTask({ maxTesters: 5, rewardPerTester: 10 })
+    const taskData = buildTask({ maxTesters: 5 })
     const createRes = await request.post('/api/tasks/create', { data: taskData })
     const { taskId } = await createRes.json()
 
@@ -212,7 +208,7 @@ test.describe('Generate Report @P0 @API', () => {
   test('non-creator cannot generate report', async ({ request }) => {
     // User A creates task
     await registerUser(request)
-    const taskData = buildTask({ maxTesters: 2, rewardPerTester: 5 })
+    const taskData = buildTask({ maxTesters: 2 })
     const createRes = await request.post('/api/tasks/create', { data: taskData })
     const { taskId } = await createRes.json()
 
@@ -232,7 +228,7 @@ test.describe('Generate Report @P0 @API', () => {
 
   test('cannot generate report for cancelled task', async ({ request }) => {
     await registerUser(request)
-    const taskData = buildTask({ maxTesters: 2, rewardPerTester: 5 })
+    const taskData = buildTask({ maxTesters: 2 })
     const createRes = await request.post('/api/tasks/create', { data: taskData })
     const { taskId } = await createRes.json()
 

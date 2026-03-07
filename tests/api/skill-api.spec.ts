@@ -34,7 +34,7 @@ test.describe('Skill API - Create Task @P0 @API', () => {
 });
 
 test.describe('Auth - Registration @P0 @API', () => {
-  test('registers new user with 100 credits', async ({ request }) => {
+  test('registers new user', async ({ request }) => {
     const userData = buildUser();
 
     const response = await request.post('/api/auth/register', {

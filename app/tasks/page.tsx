@@ -33,7 +33,6 @@ export default async function TasksPage({
     title: task.title,
     targetUrl: task.targetUrl,
     focus: task.focus,
-    rewardPerTester: task.rewardPerTester,
     estimatedMinutes: task.estimatedMinutes,
     maxTesters: task.maxTesters,
     claimsCount: task._count.claims,

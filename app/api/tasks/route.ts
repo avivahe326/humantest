@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
       title: t.title,
       targetUrl: t.targetUrl,
       focus: t.focus,
-      rewardPerTester: t.rewardPerTester,
       estimatedMinutes: t.estimatedMinutes,
       maxTesters: t.maxTesters,
       status: t.status,

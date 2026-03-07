@@ -53,13 +53,12 @@ export default function SubmitFeedbackPage() {
   const [task, setTask] = useState<{
     title: string
     targetUrl: string
-    rewardPerTester: number
     requirements: { steps: TestStep[]; nps: boolean } | null
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState<{ creditsEarned: number; newBalance: number } | null>(null)
+  const [success, setSuccess] = useState(false)
 
   // Form state
   const [firstImpression, setFirstImpression] = useState('')
@@ -217,7 +216,7 @@ export default function SubmitFeedbackPage() {
 
       const data = await res.json()
       localStorage.removeItem(storageKey)
-      setSuccess({ creditsEarned: data.creditsEarned, newBalance: data.newBalance })
+      setSuccess(true)
     } catch {
       setError(t('common.somethingWrong'))
     } finally {
@@ -229,8 +228,6 @@ export default function SubmitFeedbackPage() {
     return (
       <div className="mx-auto max-w-lg py-12 text-center space-y-4">
         <h1 className="text-3xl font-bold">{t('submit.thanks')}</h1>
-        <p className="text-lg">{t('submit.creditsEarned', { count: success.creditsEarned })}</p>
-        <p className="text-muted-foreground">{t('submit.yourBalance', { count: success.newBalance })}</p>
         <div className="flex justify-center gap-4 pt-4">
           <Link href="/tasks"><Button>{t('submit.testAnother')}</Button></Link>
           <Link href="/my-tasks"><Button variant="outline">{t('submit.viewMyTasks')}</Button></Link>

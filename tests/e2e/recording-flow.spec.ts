@@ -38,7 +38,6 @@ test.describe('Integrated Recording Flow', () => {
       url: 'https://example.com',
       title: 'Recording Test Task',
       maxTesters: 5,
-      rewardPerTester: 10,
     })
 
     const res = await request.post('/api/tasks/create', { data: taskData })
