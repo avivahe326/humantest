@@ -396,6 +396,31 @@ function logs() {
   run(`pm2 logs "${PM2_NAME}" --lines 50`)
 }
 
+async function uninstall() {
+  const appDir = getAppDir()
+  if (!appDir) {
+    console.error('  human_test() installation not found.')
+    process.exit(1)
+  }
+
+  const confirm = await ask('  This will stop the server and delete all files. Continue? (y/N)', 'N')
+  if (confirm.toLowerCase() !== 'y') {
+    console.log('  Aborted.')
+    return
+  }
+
+  // Stop pm2 process
+  if (hasPm2()) {
+    run(`pm2 stop "${PM2_NAME}"`, { ignoreError: true })
+    run(`pm2 delete "${PM2_NAME}"`, { ignoreError: true })
+  }
+
+  // Remove the directory
+  console.log(`  Removing ${appDir}...`)
+  run(`rm -rf "${appDir}"`)
+  console.log('  human_test() uninstalled.')
+}
+
 // ─── MAIN ───
 
 const command = process.argv[2]
@@ -422,6 +447,9 @@ switch (command) {
   case 'logs':
     logs()
     break
+  case 'uninstall':
+    uninstall()
+    break
   default:
     console.log(`
   human_test() CLI
@@ -434,5 +462,6 @@ switch (command) {
     humantest status      Check server status
     humantest update      Update to latest version and restart
     humantest logs        View server logs
+    humantest uninstall   Stop server and remove all files
 `)
 }
