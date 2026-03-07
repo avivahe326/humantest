@@ -168,20 +168,36 @@ async function init() {
   // 4. Port
   const port = await ask('Port', '3000')
 
+  // 5. Domain (cloud mode)
+  let domain = ''
+  if (mode === 'cloud') {
+    domain = await ask('Domain (e.g. example.com, press Enter to skip)')
+  }
+
   // 5. NEXTAUTH_SECRET
   const secret = randomBytes(32).toString('base64')
 
   // 6. Optional: SMTP
   console.log('\n  SMTP settings (optional, skip to disable email verification)')
   const smtpHost = await ask('SMTP host (press Enter to skip)')
-  let smtpPort = '', smtpUser = '', smtpPass = ''
+  let smtpPort = '', smtpUser = '', smtpPass = '', smtpFrom = ''
   if (smtpHost) {
     smtpPort = await ask('SMTP port', '465')
     smtpUser = await ask('SMTP user (email)')
     smtpPass = await ask('SMTP password')
+    smtpFrom = await ask('SMTP from address', smtpUser)
   }
 
-  // 7. Optional: GitHub token
+  // 7. Optional: OSS (Alibaba Cloud Object Storage)
+  console.log('\n  Recording storage (optional, skip to store recordings on local disk)')
+  const ossRegion = await ask('OSS Region (press Enter to skip)')
+  let ossBucket = '', ossRoleName = ''
+  if (ossRegion) {
+    ossBucket = await ask('OSS Bucket')
+    ossRoleName = await ask('OSS RAM Role Name', 'humantest')
+  }
+
+  // 8. Optional: GitHub token
   const githubToken = await ask('GitHub token for code fix PRs (press Enter to skip)')
 
   // ─── Clone repo ───
@@ -192,7 +208,7 @@ async function init() {
   const envLines = [
     `DATABASE_URL="${dbUrl}"`,
     `NEXTAUTH_SECRET="${secret}"`,
-    `NEXTAUTH_URL="http://localhost:${port}"`,
+    `NEXTAUTH_URL="${domain ? `https://${domain}` : `http://localhost:${port}`}"`,
     `PORT=${port}`,
   ]
 
@@ -209,9 +225,14 @@ async function init() {
     envLines.push(`SMTP_PORT=${smtpPort}`)
     envLines.push(`SMTP_USER="${smtpUser}"`)
     envLines.push(`SMTP_PASS="${smtpPass}"`)
+    if (smtpFrom) envLines.push(`SMTP_FROM="${smtpFrom}"`)
   }
   if (githubToken) envLines.push(`GITHUB_TOKEN="${githubToken}"`)
-
+  if (ossRegion) {
+    envLines.push(`OSS_REGION="${ossRegion}"`)
+    envLines.push(`OSS_BUCKET="${ossBucket}"`)
+    if (ossRoleName) envLines.push(`OSS_ROLE_NAME="${ossRoleName}"`)
+  }
   writeFileSync(join(installDir, '.env'), envLines.join('\n') + '\n')
 
   // ─── Generate correct Prisma schema ───
@@ -222,15 +243,17 @@ async function init() {
     schema = schema.replace(/@db\.\w+(\(\d+\))?/g, '')
     writeFileSync(schemaPath, schema)
     mkdirSync(join(installDir, 'prisma', 'data'), { recursive: true })
-    mkdirSync(join(installDir, 'data', 'recordings'), { recursive: true })
 
     // Remove standalone output for local mode (not needed, avoids cp errors)
     const nextConfigPath = join(installDir, 'next.config.ts')
     let nextConfig = readFileSync(nextConfigPath, 'utf-8')
     nextConfig = nextConfig.replace(/\s*output:\s*'standalone',?\n?/, '\n')
     writeFileSync(nextConfigPath, nextConfig)
+  }
 
-    // Add data/recordings to .gitignore
+  // ─── Local recording storage setup (when OSS not configured) ───
+  if (!ossRegion) {
+    mkdirSync(join(installDir, 'data', 'recordings'), { recursive: true })
     const gitignorePath = join(installDir, '.gitignore')
     try {
       let gitignore = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : ''
