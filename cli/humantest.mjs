@@ -148,6 +148,9 @@ async function init() {
       console.log('  You can add AI_API_KEY to .env later.\n')
     }
     aiBaseUrl = await ask('Anthropic Base URL (press Enter for official API)')
+    if (aiBaseUrl) {
+      aiModel = await ask('Model name (press Enter for claude-sonnet-4-6)')
+    }
   } else if (aiProvider === 'openai') {
     aiApiKey = await ask('OpenAI API Key (required for AI reports)')
     if (!aiApiKey) {
@@ -155,6 +158,9 @@ async function init() {
       console.log('  You can add AI_API_KEY to .env later.\n')
     }
     aiBaseUrl = await ask('OpenAI Base URL (press Enter for official API)')
+    if (aiBaseUrl) {
+      aiModel = await ask('Model name (press Enter for gpt-4o)')
+    }
   } else {
     // openai-compat
     aiApiKey = await ask('API Key')
