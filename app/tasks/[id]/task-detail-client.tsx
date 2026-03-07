@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useTranslation } from '@/lib/i18n'
+import { ReportRenderer } from './report-renderer'
 
 interface FeedbackData {
   id: string
@@ -509,10 +510,8 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="prose prose-invert max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {report}
-                  </ReactMarkdown>
+                <CardContent>
+                  <ReportRenderer report={report} />
                 </CardContent>
               </Card>
             )}
