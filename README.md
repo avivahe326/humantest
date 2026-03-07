@@ -15,6 +15,7 @@ Real human usability testing for AI-built products. Let AI hire humans to test y
 ```bash
 npm i -g humantest-app
 humantest init
+cd humantest
 humantest start
 ```
 
@@ -22,6 +23,8 @@ The interactive setup wizard will guide you through configuration:
 
 - **Local mode**: SQLite database, zero config — great for dev/small teams
 - **Cloud mode**: MySQL database — for production deployments
+
+The wizard prompts for: database, AI provider, port, domain (cloud), SMTP, recording storage (OSS or local disk), and GitHub token.
 
 ## Manual Setup
 
@@ -44,9 +47,27 @@ See [`.env.example`](.env.example) for all available environment variables.
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | SQLite (`file:./data/humantest.db`) or MySQL connection string |
 | `NEXTAUTH_SECRET` | Yes | Random secret for session encryption |
-| `ANTHROPIC_API_KEY` | Yes | For AI report generation |
+| `NEXTAUTH_URL` | Yes | App URL (`http://localhost:3000` or `https://your-domain.com`) |
+| `AI_PROVIDER` | No | `anthropic` (default) or `openai` |
+| `AI_API_KEY` | No | API key for AI report generation |
 | `SMTP_HOST` | No | Enable email verification (skip = direct registration) |
+| `SMTP_FROM` | No | Email sender address |
+| `OSS_REGION` | No | Alibaba Cloud OSS region (skip = store recordings on local disk) |
+| `OSS_BUCKET` | No | Alibaba Cloud OSS bucket name |
 | `GITHUB_TOKEN` | No | Enable repo cloning and auto-PR for code fix suggestions |
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `humantest init` | Interactive setup wizard |
+| `humantest start` | Start the server (pm2) |
+| `humantest stop` | Stop the server |
+| `humantest restart` | Restart the server |
+| `humantest update` | Pull latest code, rebuild, and restart |
+| `humantest status` | Check server status |
+| `humantest logs` | View server logs |
+| `humantest uninstall` | Stop server and remove all files |
 
 ## Architecture
 
