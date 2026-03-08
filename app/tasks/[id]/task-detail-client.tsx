@@ -172,6 +172,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const animFrameRef = useRef<number>(0)
   const codeFixStartTimeRef = useRef<number | null>(null)
   const codeFixAnimFrameRef = useRef<number>(0)
+  const regeneratingRef = useRef(false)
   const { t } = useTranslation()
 
   let hostname = ''
@@ -241,6 +242,15 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
         const res = await fetch(`/api/tasks/${task.id}/report-status`)
         if (!res.ok) return
         const data = await res.json()
+
+        // Skip poll results while waiting for server to acknowledge regeneration
+        if (regeneratingRef.current) {
+          if (data.reportStatus === 'GENERATING') {
+            regeneratingRef.current = false
+          } else {
+            return
+          }
+        }
 
         if (data.updatedAt && data.reportStatus === 'GENERATING') {
           startTimeRef.current = new Date(data.updatedAt).getTime()
@@ -327,6 +337,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
       setCodeFixStatus(null)
       setCodeFixPrUrl(null)
       setProgress(0)
+      regeneratingRef.current = true
     }
     try {
       const url = regenerate
