@@ -1,5 +1,7 @@
 # human_test()
 
+**English** | [中文](README.zh.md)
+
 [![npm version](https://img.shields.io/npm/v/humantest-app?color=cb3837)](https://www.npmjs.com/package/humantest-app)
 [![npm downloads](https://img.shields.io/npm/dm/humantest-app?color=cb3837)](https://www.npmjs.com/package/humantest-app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
