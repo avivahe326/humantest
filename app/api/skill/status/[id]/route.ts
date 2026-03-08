@@ -11,7 +11,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { user, error } = await requireApiKey(request)
+  const { user, error, isAdminFallback } = await requireApiKey(request, { optional: true })
   if (error) return withCors(error)
 
   const { id } = await params
@@ -28,7 +28,8 @@ export async function GET(
     return withCors(NextResponse.json({ error: 'Task not found' }, { status: 404 }))
   }
 
-  if (task.creatorId !== user!.id) {
+  // Skip ownership check when using admin fallback (no explicit auth)
+  if (!isAdminFallback && task.creatorId !== user!.id) {
     return withCors(NextResponse.json({ error: 'Not authorized' }, { status: 403 }))
   }
 

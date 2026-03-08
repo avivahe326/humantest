@@ -24,20 +24,45 @@ AI agents cannot judge human perception, emotion, or usability. This skill lets 
 4. Each tester completes a 3-step guided feedback flow (first impression, task steps, NPS rating)
 5. AI aggregates all feedback into a structured report with severity-ranked findings
 
-## Quick start
+## Setup
 
-You need an API key. Register at https://human-test.work/register to get one (free).
+### Option A: Hosted (zero setup)
+
+Use the hosted version at **https://human-test.work** — no installation needed. Register to get an API key, then skip to **Create a test task** below using `BASE_URL=https://human-test.work`.
+
+### Option B: Self-hosted (auto-install)
+
+human_test() can run locally. Before creating a task, check if the server is reachable:
+
+```bash
+curl -s BASE_URL/api/config
+```
+
+If the server is not running, install and start it:
+
+```bash
+npm i -g humantest-app
+cd /tmp && humantest init --non-interactive && cd humantest && humantest start
+```
+
+This auto-detects AI API keys from your environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `GEMINI_API_KEY`), creates a local SQLite database, builds the app, and starts it on port 3000.
+
+A default admin user is created automatically — no registration needed.
+
+**Set `BASE_URL`**: Ask the user once for their preferred base URL. Default: `http://localhost:3000`
+
+## Quick start
 
 ### Create a test task
 
 ```bash
-curl -X POST https://human-test.work/api/skill/human-test \
-  -H "Authorization: Bearer <your-api-key>" \
+curl -X POST BASE_URL/api/skill/human-test \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://your-product.com",
     "focus": "Test the onboarding flow",
-    "maxTesters": 5
+    "maxTesters": 5,
+    "creator": "agent-name"
   }'
 ```
 
@@ -53,8 +78,7 @@ Response:
 ### Check progress and get the report
 
 ```bash
-curl https://human-test.work/api/skill/status/<taskId> \
-  -H "Authorization: Bearer <your-api-key>"
+curl BASE_URL/api/skill/status/<taskId>
 ```
 
 Response (when completed):
@@ -76,8 +100,9 @@ Response (when completed):
 | `focus` | No | — | What testers should focus on |
 | `maxTesters` | No | 5 | Number of testers (1-50) |
 | `estimatedMinutes` | No | 10 | Expected test duration |
+| `creator` | No | admin | Name of the agent/user creating the task (auto-creates a user if needed) |
 | `webhookUrl` | No | — | HTTPS URL to receive the report on completion |
-| `repoUrl` | No | — | GitHub/Gitee repo URL for code-level fix suggestions |
+| `repoUrl` | No | — | GitHub repo URL for code-level fix suggestions |
 | `repoBranch` | No | repo default | Branch to analyze (only used with repoUrl) |
 
 ## Async webhook
@@ -179,8 +204,7 @@ If you pass a `repoUrl`, the platform will clone your repo after the report is g
 ### Example with repoUrl
 
 ```bash
-curl -X POST https://human-test.work/api/skill/human-test \
-  -H "Authorization: Bearer <your-api-key>" \
+curl -X POST BASE_URL/api/skill/human-test \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://your-product.com",
@@ -194,4 +218,4 @@ curl -X POST https://human-test.work/api/skill/human-test \
 ## Links
 
 - Web platform: https://human-test.work
-- API docs: https://human-test.work/settings (after login, shows curl examples)
+- GitHub: https://github.com/avivahe326/humantest

@@ -13,7 +13,7 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
-  const { user, error } = await requireApiKey(request)
+  const { user, error } = await requireApiKey(request, { optional: true })
   if (error) return withCors(error)
 
   const rateLimit = skillApiLimiter.check(user!.id)
@@ -29,6 +29,29 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data
+
+    // Determine task creator: explicit `creator` field, or the authenticated user
+    let creatorId = user!.id
+    if (body.creator && typeof body.creator === 'string') {
+      const creatorName = body.creator.trim()
+      if (creatorName) {
+        let creatorUser = await prisma.user.findFirst({ where: { name: creatorName } })
+        if (!creatorUser) {
+          const { randomBytes } = await import('crypto')
+          const bcrypt = await import('bcryptjs')
+          creatorUser = await prisma.user.create({
+            data: {
+              name: creatorName,
+              email: `${creatorName.toLowerCase().replace(/[^a-z0-9]/g, '')}@humantest.local`,
+              password: await bcrypt.hash(randomBytes(16).toString('hex'), 10),
+              apiKey: randomBytes(32).toString('hex'),
+            },
+          })
+        }
+        creatorId = creatorUser.id
+      }
+    }
+
     if (!isSafeTargetUrl(data.url)) {
       return withCors(NextResponse.json({ error: 'Invalid URL. Only http and https URLs are allowed.' }, { status: 400 }))
     }
@@ -76,7 +99,7 @@ export async function POST(request: NextRequest) {
         webhookUrl: data.webhookUrl,
         repoUrl: data.repoUrl,
         repoBranch: data.repoBranch,
-        creatorId: user!.id,
+        creatorId,
       },
     })
 

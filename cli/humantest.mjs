@@ -10,11 +10,14 @@ const REPO_URL = 'https://github.com/avivahe326/humantest.git'
 const APP_DIR_NAME = 'humantest'
 const PM2_NAME = 'human-test'
 
+const isNonInteractive = process.argv.includes('--non-interactive') || process.argv.includes('--defaults')
+
 function rl() {
   return createInterface({ input: process.stdin, output: process.stdout })
 }
 
 function ask(question, defaultValue = '') {
+  if (isNonInteractive) return Promise.resolve(defaultValue)
   return new Promise((resolve) => {
     const r = rl()
     const prompt = defaultValue ? `${question} (${defaultValue}): ` : `${question}: `
@@ -26,6 +29,7 @@ function ask(question, defaultValue = '') {
 }
 
 function askChoice(question, options) {
+  if (isNonInteractive) return Promise.resolve(options[0].value)
   return new Promise((resolve) => {
     const r = rl()
     console.log(`\n${question}`)
@@ -98,6 +102,56 @@ function getPort(appDir) {
   return '3000'
 }
 
+function createAdminUser(appDir) {
+  console.log('\n  Creating default admin user...')
+  const script = `
+    const { PrismaClient } = require('@prisma/client');
+    const bcrypt = require('bcryptjs');
+    const crypto = require('crypto');
+    async function main() {
+      const prisma = new PrismaClient();
+      try {
+        const existing = await prisma.user.findUnique({ where: { email: 'admin@humantest.local' } });
+        if (existing) {
+          console.log('  Admin user already exists, skipping.');
+          return;
+        }
+        const hash = await bcrypt.hash('admin', 10);
+        await prisma.user.create({
+          data: {
+            name: 'admin',
+            email: 'admin@humantest.local',
+            password: hash,
+            apiKey: crypto.randomBytes(32).toString('hex'),
+          },
+        });
+        console.log('  Admin user created (admin@humantest.local / admin)');
+      } finally {
+        await prisma.$disconnect();
+      }
+    }
+    main().catch(e => { console.error('  Warning: could not create admin user:', e.message); });
+  `
+  run(`node -e ${JSON.stringify(script)}`, { cwd: appDir, ignoreError: true })
+}
+
+// Auto-detect AI provider from environment variables
+function detectAiFromEnv() {
+  if (process.env.ANTHROPIC_API_KEY) {
+    return { provider: 'anthropic', apiKey: process.env.ANTHROPIC_API_KEY, baseUrl: '', model: '' }
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return { provider: 'openai', apiKey: process.env.OPENAI_API_KEY, baseUrl: '', model: '' }
+  }
+  if (process.env.DEEPSEEK_API_KEY) {
+    return { provider: 'openai', apiKey: process.env.DEEPSEEK_API_KEY, baseUrl: 'https://api.deepseek.com/v1', model: '' }
+  }
+  if (process.env.GEMINI_API_KEY) {
+    return { provider: 'openai', apiKey: process.env.GEMINI_API_KEY, baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: '' }
+  }
+  return null
+}
+
 // ─── COMMANDS ───
 
 async function init() {
@@ -106,107 +160,148 @@ async function init() {
   const installDir = join(process.cwd(), APP_DIR_NAME)
 
   if (existsSync(installDir)) {
-    console.log(`  Directory "${APP_DIR_NAME}" already exists.`)
-    const overwrite = await ask('  Overwrite? (y/N)', 'N')
-    if (overwrite.toLowerCase() !== 'y') {
-      console.log('  Aborted.')
-      process.exit(0)
+    if (isNonInteractive) {
+      console.log(`  Directory "${APP_DIR_NAME}" already exists, removing...`)
+      run(`rm -rf "${installDir}"`)
+    } else {
+      console.log(`  Directory "${APP_DIR_NAME}" already exists.`)
+      const overwrite = await ask('  Overwrite? (y/N)', 'N')
+      if (overwrite.toLowerCase() !== 'y') {
+        console.log('  Aborted.')
+        process.exit(0)
+      }
+      console.log('  Removing old installation...')
+      run(`rm -rf "${installDir}"`)
     }
-    console.log('  Removing old installation...')
-    run(`rm -rf "${installDir}"`)
   }
 
-  // 1. Choose mode
-  const mode = await askChoice('Deployment mode:', [
-    { label: 'Local', desc: 'SQLite, zero config — for dev/small teams', value: 'local' },
-    { label: 'Cloud', desc: 'MySQL — for production', value: 'cloud' },
-  ])
+  let mode, dbUrl, providerValue, aiApiKey, aiBaseUrl, aiModel, port, domain
+  let smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom
+  let ossRegion, ossBucket, ossRoleName, githubToken
 
-  // 2. Database
-  let dbUrl
-  if (mode === 'local') {
+  if (isNonInteractive) {
+    // Non-interactive: local mode, auto-detect AI, port 3000, skip everything else
+    mode = 'local'
     dbUrl = 'file:./data/humantest.db'
-  } else {
-    dbUrl = await ask('MySQL connection URL', 'mysql://user:password@localhost:3306/humantest')
-  }
+    port = '3000'
+    domain = ''
+    smtpHost = ''
+    ossRegion = ''
+    githubToken = ''
 
-  // 3. AI Provider
-  const aiProvider = await askChoice('AI Provider:', [
-    { label: 'Anthropic (Claude)', desc: 'recommended', value: 'anthropic' },
-    { label: 'OpenAI (GPT-4o)', desc: 'OpenAI official API', value: 'openai' },
-    { label: 'OpenAI-compatible', desc: 'DeepSeek, Ollama, etc.', value: 'openai-compat' },
-  ])
-
-  let aiApiKey = ''
-  let aiBaseUrl = ''
-  let aiModel = ''
-
-  if (aiProvider === 'anthropic') {
-    aiApiKey = await ask('Anthropic API Key (required for AI reports)')
-    if (!aiApiKey) {
-      console.log('\n  Warning: No API key provided. Report generation will not work.')
-      console.log('  You can add AI_API_KEY to .env later.\n')
-    }
-    aiBaseUrl = await ask('Anthropic Base URL (press Enter for official API)')
-    if (aiBaseUrl) {
-      aiModel = await ask('Model name (press Enter for claude-sonnet-4-6)')
-    }
-  } else if (aiProvider === 'openai') {
-    aiApiKey = await ask('OpenAI API Key (required for AI reports)')
-    if (!aiApiKey) {
-      console.log('\n  Warning: No API key provided. Report generation will not work.')
-      console.log('  You can add AI_API_KEY to .env later.\n')
-    }
-    aiBaseUrl = await ask('OpenAI Base URL (press Enter for official API)')
-    if (aiBaseUrl) {
-      aiModel = await ask('Model name (press Enter for gpt-4o)')
+    const detected = detectAiFromEnv()
+    if (detected) {
+      providerValue = detected.provider
+      aiApiKey = detected.apiKey
+      aiBaseUrl = detected.baseUrl
+      aiModel = detected.model
+      console.log(`  AI provider: ${detected.provider}${detected.baseUrl ? ` (${detected.baseUrl})` : ''} (auto-detected from env)`)
+    } else {
+      providerValue = 'anthropic'
+      aiApiKey = ''
+      aiBaseUrl = ''
+      aiModel = ''
+      console.log('  Warning: No AI API key found in environment. Report generation will not work.')
+      console.log('  Set ANTHROPIC_API_KEY, OPENAI_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY and re-run.')
     }
   } else {
-    // openai-compat
-    aiApiKey = await ask('API Key')
-    aiBaseUrl = await ask('Base URL (e.g. https://api.deepseek.com/v1)')
-    aiModel = await ask('Model name (e.g. deepseek-chat)')
-    if (!aiApiKey || !aiBaseUrl) {
-      console.log('\n  Warning: Incomplete config. You can update .env later.\n')
+    // Interactive mode (existing flow)
+
+    // 1. Choose mode
+    mode = await askChoice('Deployment mode:', [
+      { label: 'Local', desc: 'SQLite, zero config — for dev/small teams', value: 'local' },
+      { label: 'Cloud', desc: 'MySQL — for production', value: 'cloud' },
+    ])
+
+    // 2. Database
+    if (mode === 'local') {
+      dbUrl = 'file:./data/humantest.db'
+    } else {
+      dbUrl = await ask('MySQL connection URL', 'mysql://user:password@localhost:3306/humantest')
     }
-  }
 
-  const providerValue = aiProvider === 'openai-compat' ? 'openai' : aiProvider
+    // 3. AI Provider
+    const aiProvider = await askChoice('AI Provider:', [
+      { label: 'Anthropic (Claude)', desc: 'recommended', value: 'anthropic' },
+      { label: 'OpenAI (GPT-4o)', desc: 'OpenAI official API', value: 'openai' },
+      { label: 'OpenAI-compatible', desc: 'DeepSeek, Ollama, etc.', value: 'openai-compat' },
+    ])
 
-  // 4. Port
-  const port = await ask('Port', '3000')
+    aiApiKey = ''
+    aiBaseUrl = ''
+    aiModel = ''
 
-  // 5. Domain (cloud mode)
-  let domain = ''
-  if (mode === 'cloud') {
-    domain = await ask('Domain (e.g. example.com, press Enter to skip)')
+    if (aiProvider === 'anthropic') {
+      aiApiKey = await ask('Anthropic API Key (required for AI reports)')
+      if (!aiApiKey) {
+        console.log('\n  Warning: No API key provided. Report generation will not work.')
+        console.log('  You can add AI_API_KEY to .env later.\n')
+      }
+      aiBaseUrl = await ask('Anthropic Base URL (press Enter for official API)')
+      if (aiBaseUrl) {
+        aiModel = await ask('Model name (press Enter for claude-sonnet-4-6)')
+      }
+    } else if (aiProvider === 'openai') {
+      aiApiKey = await ask('OpenAI API Key (required for AI reports)')
+      if (!aiApiKey) {
+        console.log('\n  Warning: No API key provided. Report generation will not work.')
+        console.log('  You can add AI_API_KEY to .env later.\n')
+      }
+      aiBaseUrl = await ask('OpenAI Base URL (press Enter for official API)')
+      if (aiBaseUrl) {
+        aiModel = await ask('Model name (press Enter for gpt-4o)')
+      }
+    } else {
+      // openai-compat
+      aiApiKey = await ask('API Key')
+      aiBaseUrl = await ask('Base URL (e.g. https://api.deepseek.com/v1)')
+      aiModel = await ask('Model name (e.g. deepseek-chat)')
+      if (!aiApiKey || !aiBaseUrl) {
+        console.log('\n  Warning: Incomplete config. You can update .env later.\n')
+      }
+    }
+
+    providerValue = aiProvider === 'openai-compat' ? 'openai' : aiProvider
+
+    // 4. Port
+    port = await ask('Port', '3000')
+
+    // 5. Domain (cloud mode)
+    domain = ''
+    if (mode === 'cloud') {
+      domain = await ask('Domain (e.g. example.com, press Enter to skip)')
+    }
+
+    // 6. Optional: SMTP
+    console.log('\n  SMTP settings (optional, skip to disable email verification)')
+    smtpHost = await ask('SMTP host (press Enter to skip)')
+    smtpPort = ''
+    smtpUser = ''
+    smtpPass = ''
+    smtpFrom = ''
+    if (smtpHost) {
+      smtpPort = await ask('SMTP port', '465')
+      smtpUser = await ask('SMTP user (email)')
+      smtpPass = await ask('SMTP password')
+      smtpFrom = await ask('SMTP from address', smtpUser)
+    }
+
+    // 7. Optional: OSS (Alibaba Cloud Object Storage)
+    console.log('\n  Recording storage (optional, skip to store recordings on local disk)')
+    ossRegion = await ask('OSS Region (press Enter to skip)')
+    ossBucket = ''
+    ossRoleName = ''
+    if (ossRegion) {
+      ossBucket = await ask('OSS Bucket')
+      ossRoleName = await ask('OSS RAM Role Name', 'humantest')
+    }
+
+    // 8. Optional: GitHub token
+    githubToken = await ask('GitHub token for code fix PRs (press Enter to skip)')
   }
 
   // 5. NEXTAUTH_SECRET
   const secret = randomBytes(32).toString('base64')
-
-  // 6. Optional: SMTP
-  console.log('\n  SMTP settings (optional, skip to disable email verification)')
-  const smtpHost = await ask('SMTP host (press Enter to skip)')
-  let smtpPort = '', smtpUser = '', smtpPass = '', smtpFrom = ''
-  if (smtpHost) {
-    smtpPort = await ask('SMTP port', '465')
-    smtpUser = await ask('SMTP user (email)')
-    smtpPass = await ask('SMTP password')
-    smtpFrom = await ask('SMTP from address', smtpUser)
-  }
-
-  // 7. Optional: OSS (Alibaba Cloud Object Storage)
-  console.log('\n  Recording storage (optional, skip to store recordings on local disk)')
-  const ossRegion = await ask('OSS Region (press Enter to skip)')
-  let ossBucket = '', ossRoleName = ''
-  if (ossRegion) {
-    ossBucket = await ask('OSS Bucket')
-    ossRoleName = await ask('OSS RAM Role Name', 'humantest')
-  }
-
-  // 8. Optional: GitHub token
-  const githubToken = await ask('GitHub token for code fix PRs (press Enter to skip)')
 
   // ─── Clone repo ───
   console.log('\n  Downloading human_test()...')
@@ -283,6 +378,9 @@ async function init() {
   console.log('\n  Setting up database...')
   run('npx prisma db push', { cwd: installDir })
 
+  // ─── Create admin user ───
+  createAdminUser(installDir)
+
   // ─── Build ───
   console.log('\n  Building application...')
   run('npm run build', { cwd: installDir })
@@ -292,6 +390,8 @@ async function init() {
 
   console.log(`
   Setup complete!
+
+  Default admin account: admin@humantest.local / admin
 
   Start the server:
     cd ${APP_DIR_NAME} && humantest start
@@ -417,6 +517,9 @@ function update() {
   console.log('  Updating database...')
   run('npx prisma db push', { cwd: appDir, ignoreError: true })
 
+  // Ensure admin user exists
+  createAdminUser(appDir)
+
   console.log('  Building...')
   run('npm run build', { cwd: appDir })
 
@@ -529,13 +632,13 @@ switch (command) {
   human_test() CLI
 
   Usage:
-    humantest init        Interactive setup wizard
-    humantest start       Start the server (pm2)
-    humantest stop        Stop the server
-    humantest restart     Restart the server
-    humantest status      Check server status
-    humantest update      Update to latest version and restart
-    humantest logs        View server logs
-    humantest uninstall   Stop server and remove all files
+    humantest init [--non-interactive]  Setup wizard (--non-interactive for auto mode)
+    humantest start                     Start the server (pm2)
+    humantest stop                      Stop the server
+    humantest restart                   Restart the server
+    humantest status                    Check server status
+    humantest update                    Update to latest version and restart
+    humantest logs                      View server logs
+    humantest uninstall                 Stop server and remove all files
 `)
 }

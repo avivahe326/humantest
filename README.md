@@ -26,6 +26,25 @@ The interactive setup wizard will guide you through configuration:
 
 The wizard prompts for: database, AI provider, port, domain (cloud), SMTP, recording storage (OSS or local disk), and GitHub token.
 
+### Non-interactive setup
+
+For automated/agent-driven installs, use `--non-interactive`:
+
+```bash
+humantest init --non-interactive
+```
+
+This uses local mode (SQLite), auto-detects AI API keys from environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `GEMINI_API_KEY`), and runs on port 3000. A default admin user (`admin@humantest.local` / `admin`) is created automatically.
+
+### Default admin user
+
+Both interactive and non-interactive init create a default admin user:
+
+- **Email**: `admin@humantest.local`
+- **Password**: `admin`
+
+This user is used as the fallback when API requests are made without authentication. Change the password after first login in production.
+
 ## Manual Setup
 
 ```bash
@@ -60,7 +79,7 @@ See [`.env.example`](.env.example) for all available environment variables.
 
 | Command | Description |
 |---------|-------------|
-| `humantest init` | Interactive setup wizard |
+| `humantest init [--non-interactive]` | Setup wizard (`--non-interactive` for auto mode) |
 | `humantest start` | Start the server (pm2) |
 | `humantest stop` | Stop the server |
 | `humantest restart` | Restart the server |
@@ -102,11 +121,10 @@ human_test() is designed as an AI agent skill. Your AI coding agent can call it 
 npx skills add avivahe326/human-test-skill
 ```
 
-Or call the API directly:
+Or call the API directly (no authentication required for self-hosted instances):
 
 ```bash
 curl -X POST http://localhost:3000/api/skill/human-test \
-  -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://your-product.com",
