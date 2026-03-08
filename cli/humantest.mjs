@@ -23,9 +23,8 @@ function guardCancel(value) {
 async function ask(message, defaultValue = '') {
   if (isNonInteractive) return defaultValue
   const value = await p.text({
-    message,
-    initialValue: defaultValue,
-    placeholder: defaultValue ? undefined : 'press Enter to skip',
+    message: defaultValue ? message : `${message} (optional)`,
+    initialValue: defaultValue || undefined,
   })
   return guardCancel(value) || defaultValue
 }
