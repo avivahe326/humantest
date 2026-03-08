@@ -3,8 +3,8 @@
 import { execSync, spawn } from 'child_process'
 import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { createInterface } from 'readline'
 import { randomBytes } from 'crypto'
+import * as p from '@clack/prompts'
 
 const REPO_URL = 'https://github.com/avivahe326/humantest.git'
 const APP_DIR_NAME = 'humantest'
@@ -12,34 +12,41 @@ const PM2_NAME = 'human-test'
 
 const isNonInteractive = process.argv.includes('--non-interactive') || process.argv.includes('--defaults')
 
-function rl() {
-  return createInterface({ input: process.stdin, output: process.stdout })
+function guardCancel(value) {
+  if (p.isCancel(value)) {
+    p.cancel('Setup cancelled.')
+    process.exit(0)
+  }
+  return value
 }
 
-function ask(question, defaultValue = '') {
-  if (isNonInteractive) return Promise.resolve(defaultValue)
-  return new Promise((resolve) => {
-    const r = rl()
-    const prompt = defaultValue ? `${question} (${defaultValue}): ` : `${question}: `
-    r.question(prompt, (answer) => {
-      r.close()
-      resolve(answer.trim() || defaultValue)
-    })
+async function ask(message, defaultValue = '') {
+  if (isNonInteractive) return defaultValue
+  const value = await p.text({
+    message,
+    initialValue: defaultValue,
+    placeholder: defaultValue ? undefined : 'press Enter to skip',
   })
+  return guardCancel(value) || defaultValue
 }
 
-function askChoice(question, options) {
-  if (isNonInteractive) return Promise.resolve(options[0].value)
-  return new Promise((resolve) => {
-    const r = rl()
-    console.log(`\n${question}`)
-    options.forEach((opt, i) => console.log(`  ${i + 1}. ${opt.label} — ${opt.desc}`))
-    r.question(`Choose [1-${options.length}]: `, (answer) => {
-      r.close()
-      const idx = parseInt(answer) - 1
-      resolve(options[idx]?.value || options[0].value)
-    })
+async function askChoice(message, options) {
+  if (isNonInteractive) return options[0].value
+  const value = await p.select({
+    message,
+    options: options.map(opt => ({
+      value: opt.value,
+      label: opt.label,
+      hint: opt.desc,
+    })),
   })
+  return guardCancel(value)
+}
+
+async function askConfirm(message, initial = false) {
+  if (isNonInteractive) return initial
+  const value = await p.confirm({ message, initialValue: initial })
+  return guardCancel(value)
 }
 
 function run(cmd, opts = {}) {
@@ -200,22 +207,21 @@ function detectAiFromEnv() {
 // ─── COMMANDS ───
 
 async function init() {
-  console.log('\n  human_test() Setup\n')
+  p.intro('human_test() Setup')
 
   const installDir = join(process.cwd(), APP_DIR_NAME)
 
   if (existsSync(installDir)) {
     if (isNonInteractive) {
-      console.log(`  Directory "${APP_DIR_NAME}" already exists, removing...`)
+      p.log.warn(`Directory "${APP_DIR_NAME}" already exists, removing...`)
       run(`rm -rf "${installDir}"`)
     } else {
-      console.log(`  Directory "${APP_DIR_NAME}" already exists.`)
-      const overwrite = await ask('  Overwrite? (y/N)', 'N')
-      if (overwrite.toLowerCase() !== 'y') {
-        console.log('  Aborted.')
+      const overwrite = await askConfirm(`Directory "${APP_DIR_NAME}" already exists. Overwrite?`)
+      if (!overwrite) {
+        p.cancel('Setup cancelled.')
         process.exit(0)
       }
-      console.log('  Removing old installation...')
+      p.log.step('Removing old installation...')
       run(`rm -rf "${installDir}"`)
     }
   }
@@ -280,8 +286,7 @@ async function init() {
     if (aiProvider === 'anthropic') {
       aiApiKey = await ask('Anthropic API Key (required for AI reports)')
       if (!aiApiKey) {
-        console.log('\n  Warning: No API key provided. Report generation will not work.')
-        console.log('  You can add AI_API_KEY to .env later.\n')
+        p.log.warn('No API key provided. Report generation will not work.\n  You can add AI_API_KEY to .env later.')
       }
       aiBaseUrl = await ask('Anthropic Base URL (press Enter for official API)')
       if (aiBaseUrl) {
@@ -290,8 +295,7 @@ async function init() {
     } else if (aiProvider === 'openai') {
       aiApiKey = await ask('OpenAI API Key (required for AI reports)')
       if (!aiApiKey) {
-        console.log('\n  Warning: No API key provided. Report generation will not work.')
-        console.log('  You can add AI_API_KEY to .env later.\n')
+        p.log.warn('No API key provided. Report generation will not work.\n  You can add AI_API_KEY to .env later.')
       }
       aiBaseUrl = await ask('OpenAI Base URL (press Enter for official API)')
       if (aiBaseUrl) {
@@ -303,7 +307,7 @@ async function init() {
       aiBaseUrl = await ask('Base URL (e.g. https://api.deepseek.com/v1)')
       aiModel = await ask('Model name (e.g. deepseek-chat)')
       if (!aiApiKey || !aiBaseUrl) {
-        console.log('\n  Warning: Incomplete config. You can update .env later.\n')
+        p.log.warn('Incomplete config. You can update .env later.')
       }
     }
 
@@ -319,8 +323,8 @@ async function init() {
     }
 
     // 6. Optional: SMTP
-    console.log('\n  SMTP settings (optional, skip to disable email verification)')
-    smtpHost = await ask('SMTP host (press Enter to skip)')
+    p.log.info('SMTP settings (optional, skip to disable email verification)')
+    smtpHost = await ask('SMTP host')
     smtpPort = ''
     smtpUser = ''
     smtpPass = ''
@@ -333,8 +337,8 @@ async function init() {
     }
 
     // 7. Optional: OSS (Alibaba Cloud Object Storage)
-    console.log('\n  Recording storage (optional, skip to store recordings on local disk)')
-    ossRegion = await ask('OSS Region (press Enter to skip)')
+    p.log.info('Recording storage (optional, skip to store recordings on local disk)')
+    ossRegion = await ask('OSS Region')
     ossBucket = ''
     ossRoleName = ''
     if (ossRegion) {
@@ -343,19 +347,23 @@ async function init() {
     }
 
     // 8. Optional: GitHub token
-    githubToken = await ask('GitHub token for code fix PRs (press Enter to skip)')
+    githubToken = await ask('GitHub token for code fix PRs')
 
     // 9. Default language
-    const langChoice = await ask('Default language for AI-generated content (cn/en)', 'en')
-    defaultLocale = langChoice.toLowerCase() === 'cn' ? 'zh' : 'en'
+    defaultLocale = await askChoice('Default language for AI-generated content', [
+      { label: 'English', desc: 'en', value: 'en' },
+      { label: '中文', desc: 'zh', value: 'zh' },
+    ])
   }
 
   // 5. NEXTAUTH_SECRET
   const secret = randomBytes(32).toString('base64')
 
   // ─── Clone repo ───
-  console.log('\n  Downloading human_test()...')
-  run(`git clone --depth 1 ${REPO_URL} "${installDir}"`)
+  const s = p.spinner()
+  s.start('Downloading human_test()...')
+  run(`git clone --depth 1 ${REPO_URL} "${installDir}"`, { stdio: 'pipe' })
+  s.stop('Downloaded human_test()')
 
   // ─── Generate .env ───
   const envLines = [
@@ -422,12 +430,14 @@ async function init() {
   }
 
   // ─── Install dependencies ───
-  console.log('\n  Installing dependencies...')
-  run('npm install', { cwd: installDir })
+  s.start('Installing dependencies...')
+  run('npm install', { cwd: installDir, stdio: 'pipe' })
+  s.stop('Dependencies installed')
 
   // ─── Setup database ───
-  console.log('\n  Setting up database...')
-  run('npx prisma db push', { cwd: installDir })
+  s.start('Setting up database...')
+  run('npx prisma db push', { cwd: installDir, stdio: 'pipe' })
+  s.stop('Database ready')
 
   // ─── Create admin user ───
   createAdminUser(installDir)
@@ -436,22 +446,21 @@ async function init() {
   seedSettings(installDir)
 
   // ─── Build ───
-  console.log('\n  Building application...')
-  run('npm run build', { cwd: installDir })
+  s.start('Building application...')
+  run('npm run build', { cwd: installDir, stdio: 'pipe' })
+  s.stop('Build complete')
 
   // ─── Ensure pm2 is available ───
   ensurePm2()
 
-  console.log(`
-  Setup complete!
+  p.outro(`Setup complete!
 
   Default admin account: admin@humantest.local / admin
 
   Start the server:
     cd ${APP_DIR_NAME} && humantest start
 
-  The server will run at http://localhost:${port}
-`)
+  The server will run at http://localhost:${port}`)
 }
 
 function start() {
@@ -468,7 +477,7 @@ function start() {
   if (pm2List) {
     try {
       const procs = JSON.parse(pm2List)
-      const running = procs.find(p => p.name === PM2_NAME && p.pm2_env?.status === 'online')
+      const running = procs.find(proc => proc.name === PM2_NAME && proc.pm2_env?.status === 'online')
       if (running) {
         console.log(`  human_test() is already running (PID ${running.pid}).`)
         return
@@ -538,7 +547,7 @@ function update() {
     const tmpDir = join(appDir, '.humantest-update-tmp')
     run(`git clone --depth 1 ${REPO_URL} "${tmpDir}"`)
     const preserveList = ['.env', 'prisma/data', 'node_modules', '.next']
-    run(`rsync -a --exclude='.git' ${preserveList.map(p => `--exclude='${p}'`).join(' ')} "${tmpDir}/" "${appDir}/"`)
+    run(`rsync -a --exclude='.git' ${preserveList.map(item => `--exclude='${item}'`).join(' ')} "${tmpDir}/" "${appDir}/"`)
     run(`rm -rf "${tmpDir}"`)
   }
 
@@ -600,10 +609,10 @@ function status() {
   if (pm2List) {
     try {
       const procs = JSON.parse(pm2List)
-      const proc = procs.find(p => p.name === PM2_NAME)
+      const proc = procs.find(item => item.name === PM2_NAME)
       if (proc) {
-        const s = proc.pm2_env?.status || 'unknown'
-        console.log(`  human_test() — ${s} (PID ${proc.pid}, uptime: ${proc.pm2_env?.pm_uptime ? Math.round((Date.now() - proc.pm2_env.pm_uptime) / 1000) + 's' : 'N/A'})`)
+        const st = proc.pm2_env?.status || 'unknown'
+        console.log(`  human_test() — ${st} (PID ${proc.pid}, uptime: ${proc.pm2_env?.pm_uptime ? Math.round((Date.now() - proc.pm2_env.pm_uptime) / 1000) + 's' : 'N/A'})`)
         return
       }
     } catch {}
@@ -634,9 +643,9 @@ async function uninstall() {
     process.exit(1)
   }
 
-  const confirm = await ask('  This will stop the server and delete all files. Continue? (y/N)', 'N')
-  if (confirm.toLowerCase() !== 'y') {
-    console.log('  Aborted.')
+  const doUninstall = await askConfirm('This will stop the server and delete all files. Continue?')
+  if (!doUninstall) {
+    p.cancel('Aborted.')
     return
   }
 
