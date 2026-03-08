@@ -174,7 +174,15 @@
     "codeFixPr": "已自动创建修复 PR！",
     "viewPr": "查看 Pull Request",
     "generateCodeFix": "生成代码修复 PR",
-    "generatingCodeFix": "正在生成代码修复..."
+    "generatingCodeFix": "正在生成代码修复...",
+    "codeFixTab": "代码修复",
+    "pullRequestTab": "Pull Request",
+    "noCodeFix": "暂无代码修复建议。",
+    "noPr": "暂未创建 Pull Request。",
+    "regenerateCodeFix": "重新生成",
+    "codeFixProgress": "正在分析代码并生成修复建议...",
+    "prNoWriteAccess": "未创建 PR（无仓库写权限），请查看代码修复标签页的建议。",
+    "generateCodeFixBtn": "生成代码修复"
   },
   "submit": {
     "loading": "加载中...",

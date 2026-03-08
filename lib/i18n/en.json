@@ -174,7 +174,15 @@
     "codeFixPr": "Automated fix PR created!",
     "viewPr": "View Pull Request",
     "generateCodeFix": "Generate Code Fix PR",
-    "generatingCodeFix": "Generating code fix..."
+    "generatingCodeFix": "Generating code fix...",
+    "codeFixTab": "Code Fix",
+    "pullRequestTab": "Pull Request",
+    "noCodeFix": "No code fix suggestions yet.",
+    "noPr": "No pull request created.",
+    "regenerateCodeFix": "Regenerate",
+    "codeFixProgress": "Analyzing code and generating fixes...",
+    "prNoWriteAccess": "No PR was created (no write access to repo). See Code Fix tab for suggestions.",
+    "generateCodeFixBtn": "Generate Code Fix"
   },
   "submit": {
     "loading": "Loading...",

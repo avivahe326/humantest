@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -12,7 +12,7 @@ import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useTranslation } from '@/lib/i18n'
-import { ReportRenderer } from './report-renderer'
+import { ReportRenderer, CodeFixRenderer, parseReport } from './report-renderer'
 
 interface FeedbackData {
   id: string
@@ -165,10 +165,13 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const [codeFixStatus, setCodeFixStatus] = useState(task.codeFixStatus)
   const [codeFixPrUrl, setCodeFixPrUrl] = useState(task.codeFixPrUrl)
   const [progress, setProgress] = useState(0)
+  const [codeFixProgress, setCodeFixProgress] = useState(0)
   const [feedbackStatuses, setFeedbackStatuses] = useState<FeedbackStatusInfo[]>([])
   const [expandedFeedbacks, setExpandedFeedbacks] = useState<Set<string>>(new Set())
   const startTimeRef = useRef<number | null>(null)
   const animFrameRef = useRef<number>(0)
+  const codeFixStartTimeRef = useRef<number | null>(null)
+  const codeFixAnimFrameRef = useRef<number>(0)
   const { t } = useTranslation()
 
   let hostname = ''
@@ -193,6 +196,14 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
     animFrameRef.current = requestAnimationFrame(updateProgress)
   }, [])
 
+  const updateCodeFixProgress = useCallback(() => {
+    if (!codeFixStartTimeRef.current) return
+    const elapsed = (Date.now() - codeFixStartTimeRef.current) / 1000
+    const simulated = 90 * (1 - Math.exp(-elapsed / 90))
+    setCodeFixProgress(Math.round(simulated))
+    codeFixAnimFrameRef.current = requestAnimationFrame(updateCodeFixProgress)
+  }, [])
+
   useEffect(() => {
     if (isGenerating) {
       if (!startTimeRef.current) {
@@ -205,6 +216,22 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
     }
     return () => cancelAnimationFrame(animFrameRef.current)
   }, [isGenerating, updateProgress])
+
+  useEffect(() => {
+    if (isCodeFixing) {
+      if (!codeFixStartTimeRef.current) {
+        codeFixStartTimeRef.current = Date.now()
+      }
+      codeFixAnimFrameRef.current = requestAnimationFrame(updateCodeFixProgress)
+    } else {
+      cancelAnimationFrame(codeFixAnimFrameRef.current)
+      if (codeFixStatus === 'COMPLETED' || codeFixStatus === 'FAILED') {
+        setCodeFixProgress(codeFixStatus === 'COMPLETED' ? 100 : 0)
+      }
+      codeFixStartTimeRef.current = null
+    }
+    return () => cancelAnimationFrame(codeFixAnimFrameRef.current)
+  }, [isCodeFixing, codeFixStatus, updateCodeFixProgress])
 
   useEffect(() => {
     if (!isGenerating && !isCodeFixing) return
@@ -349,6 +376,10 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const analysisTotal = feedbackStatuses.length
   const allAnalysesDone = analysisTotal > 0 && analysisCompleted === analysisTotal
 
+  const parsedReport = useMemo(() => report ? parseReport(report) : null, [report])
+  const hasRepoUrl = !!task.repoUrl
+  const showCodeFixTabs = hasRepoUrl && report
+
   const showTabs = report || isGenerating || reportStatus === 'FAILED' || (isCreator && initialFeedbacks.length > 0)
 
   return (
@@ -427,11 +458,6 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                 {generatingReport ? t('taskDetail.starting') : t('taskDetail.generateReport')}
               </Button>
             )}
-            {report && task.repoUrl && hasGithubToken && !codeFixPrUrl && !isCodeFixing && codeFixStatus !== 'GENERATING' && (
-              <Button onClick={handleGenerateCodeFix} disabled={generatingCodeFix} variant="secondary">
-                {generatingCodeFix ? t('taskDetail.starting') : t('taskDetail.generateCodeFix')}
-              </Button>
-            )}
             {(task.status === 'OPEN' || task.status === 'IN_PROGRESS') && (
               <Button onClick={handleCancel} disabled={cancelling} variant="destructive">
                 {cancelling ? t('taskDetail.cancelling') : t('taskDetail.cancelTask')}
@@ -466,6 +492,12 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
         <Tabs defaultValue="report" className="w-full">
           <TabsList className="w-full">
             <TabsTrigger value="report" className="flex-1">{t('taskDetail.testReport')}</TabsTrigger>
+            {showCodeFixTabs && (
+              <TabsTrigger value="codefix" className="flex-1">{t('taskDetail.codeFixTab')}</TabsTrigger>
+            )}
+            {showCodeFixTabs && (
+              <TabsTrigger value="pr" className="flex-1">{t('taskDetail.pullRequestTab')}</TabsTrigger>
+            )}
             {isCreator && initialFeedbacks.length > 0 && (
               <TabsTrigger value="submissions" className="flex-1">
                 {t('taskDetail.submissions', { count: initialFeedbacks.length })}
@@ -551,44 +583,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ReportRenderer report={report} />
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Code Fix Status */}
-            {isCodeFixing && (
-              <Card>
-                <CardContent className="pt-6 space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-yellow-500 animate-pulse">&#9679;</span>
-                    <span>{t('taskDetail.codeFixGenerating')}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{t('taskDetail.codeFixNote')}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {codeFixStatus === 'FAILED' && (
-              <Card className="border-yellow-500/50">
-                <CardContent className="pt-6">
-                  <p className="text-sm text-yellow-500">{t('taskDetail.codeFixFailed')}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {codeFixPrUrl && (
-              <Card className="border-green-500/50">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-500">&#10003;</span>
-                    <span className="text-sm">
-                      {t('taskDetail.codeFixPr')}{' '}
-                      <a href={codeFixPrUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
-                        {t('taskDetail.viewPr')}
-                      </a>
-                    </span>
-                  </div>
+                  <ReportRenderer report={report} excludeCodeFix={hasRepoUrl} />
                 </CardContent>
               </Card>
             )}
@@ -597,6 +592,118 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
               <p className="text-sm text-muted-foreground text-center py-8">{t('taskDetail.noReport')}</p>
             )}
           </TabsContent>
+
+          {/* Code Fix Tab */}
+          {showCodeFixTabs && (
+            <TabsContent value="codefix" className="space-y-4 mt-4">
+              {isCodeFixing && (
+                <Card>
+                  <CardContent className="pt-6 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{t('taskDetail.codeFixProgress')}</p>
+                      <span className="text-sm text-muted-foreground">{codeFixProgress}%</span>
+                    </div>
+                    <Progress value={codeFixProgress} />
+                    <p className="text-xs text-muted-foreground">{t('taskDetail.codeFixNote')}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {codeFixStatus === 'FAILED' && (
+                <Card className="border-yellow-500/50">
+                  <CardContent className="pt-6 space-y-3">
+                    <p className="text-sm text-yellow-500">{t('taskDetail.codeFixFailed')}</p>
+                    {isCreator && hasGithubToken && (
+                      <Button onClick={handleGenerateCodeFix} disabled={generatingCodeFix} variant="secondary" size="sm">
+                        {generatingCodeFix ? t('taskDetail.starting') : t('taskDetail.retryReport')}
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isCodeFixing && codeFixStatus !== 'FAILED' && parsedReport?.codeFixSuggestions && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{t('taskDetail.codeFixTab')}</CardTitle>
+                      {isCreator && hasGithubToken && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleGenerateCodeFix}
+                          disabled={generatingCodeFix}
+                        >
+                          {generatingCodeFix ? t('taskDetail.starting') : t('taskDetail.regenerateCodeFix')}
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <CodeFixRenderer content={parsedReport.codeFixSuggestions} />
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isCodeFixing && codeFixStatus !== 'FAILED' && !parsedReport?.codeFixSuggestions && (
+                <div className="text-center py-8 space-y-3">
+                  <p className="text-sm text-muted-foreground">{t('taskDetail.noCodeFix')}</p>
+                  {isCreator && hasGithubToken && !codeFixStatus && (
+                    <Button onClick={handleGenerateCodeFix} disabled={generatingCodeFix} variant="secondary">
+                      {generatingCodeFix ? t('taskDetail.starting') : t('taskDetail.generateCodeFixBtn')}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+          )}
+
+          {/* Pull Request Tab */}
+          {showCodeFixTabs && (
+            <TabsContent value="pr" className="space-y-4 mt-4">
+              {codeFixPrUrl ? (
+                <Card className="border-green-500/50">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{t('taskDetail.pullRequestTab')}</CardTitle>
+                      {isCreator && hasGithubToken && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleGenerateCodeFix}
+                          disabled={generatingCodeFix || isCodeFixing}
+                        >
+                          {generatingCodeFix ? t('taskDetail.starting') : t('taskDetail.regenerateCodeFix')}
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-500">&#10003;</span>
+                      <span className="text-sm">
+                        {t('taskDetail.codeFixPr')}{' '}
+                        <a href={codeFixPrUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+                          {t('taskDetail.viewPr')}
+                        </a>
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-sm text-muted-foreground">
+                    {isCodeFixing
+                      ? t('taskDetail.codeFixProgress')
+                      : !hasGithubToken
+                        ? t('taskDetail.prNoWriteAccess')
+                        : t('taskDetail.noPr')
+                    }
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+          )}
 
           {isCreator && initialFeedbacks.length > 0 && (
             <TabsContent value="submissions" className="space-y-3 mt-4">

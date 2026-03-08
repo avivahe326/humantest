@@ -228,7 +228,22 @@ function countSeverities(issues: ParsedIssue[]): string {
     .join(' · ')
 }
 
-export function ReportRenderer({ report }: { report: string }) {
+export { parseReport }
+export type { ParsedReport }
+
+export function CodeFixRenderer({ content }: { content: string }) {
+  if (!content) return null
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Code Fix Suggestions</h3>
+      <div className="text-sm prose prose-invert prose-sm max-w-none">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      </div>
+    </div>
+  )
+}
+
+export function ReportRenderer({ report, excludeCodeFix }: { report: string; excludeCodeFix?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const parsed = useMemo(() => parseReport(report), [report])
 
@@ -323,7 +338,7 @@ export function ReportRenderer({ report }: { report: string }) {
       )}
 
       {/* Code Fix Suggestions */}
-      {parsed.codeFixSuggestions && (
+      {parsed.codeFixSuggestions && !excludeCodeFix && (
         <div className="space-y-2">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Code Fix Suggestions</h3>
           <div className="text-sm prose prose-invert prose-sm max-w-none">
