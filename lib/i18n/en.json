@@ -172,7 +172,9 @@
     "codeFixNote": "Your repo is being cloned and analyzed against the usability issues. This may take a few minutes.",
     "codeFixFailed": "Code fix analysis failed. The report is still available above.",
     "codeFixPr": "Automated fix PR created!",
-    "viewPr": "View Pull Request"
+    "viewPr": "View Pull Request",
+    "generateCodeFix": "Generate Code Fix PR",
+    "generatingCodeFix": "Generating code fix..."
   },
   "submit": {
     "loading": "Loading...",

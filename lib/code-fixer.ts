@@ -1,6 +1,6 @@
 import { chat } from '@/lib/ai-client'
 import { prisma } from '@/lib/prisma'
-import { sendWebhook } from '@/lib/webhook'
+import { sendCodeFixWebhook } from '@/lib/webhook'
 import { getLanguageInstruction } from '@/lib/ai-locale'
 import { mkdtemp, readdir, readFile, rm } from 'fs/promises'
 import { join } from 'path'
@@ -425,7 +425,7 @@ export async function runCodeFixAnalysis(taskId: string): Promise<void> {
         repoUrl: true,
         repoBranch: true,
         targetUrl: true,
-        webhookUrl: true,
+        codeFixWebhookUrl: true,
         locale: true,
       },
     })
@@ -442,8 +442,8 @@ export async function runCodeFixAnalysis(taskId: string): Promise<void> {
         where: { id: taskId },
         data: { codeFixStatus: 'COMPLETED' },
       })
-      if (task.webhookUrl) {
-        try { await sendWebhook(taskId) } catch (err) { console.error('Webhook error:', err) }
+      if (task.codeFixWebhookUrl) {
+        try { await sendCodeFixWebhook(taskId) } catch (err) { console.error('Code fix webhook error:', err) }
       }
       return
     }
@@ -473,8 +473,8 @@ export async function runCodeFixAnalysis(taskId: string): Promise<void> {
           report: task.report + '\n\n## Code Fix Suggestions\n\nNo relevant source files found in the repository to generate code-level fix suggestions.',
         },
       })
-      if (task.webhookUrl) {
-        try { await sendWebhook(taskId) } catch (err) { console.error('Webhook error:', err) }
+      if (task.codeFixWebhookUrl) {
+        try { await sendCodeFixWebhook(taskId) } catch (err) { console.error('Code fix webhook error:', err) }
       }
       return
     }
@@ -512,9 +512,9 @@ export async function runCodeFixAnalysis(taskId: string): Promise<void> {
       },
     })
 
-    // 7. Send webhook with updated report
-    if (task.webhookUrl) {
-      try { await sendWebhook(taskId) } catch (err) { console.error('Webhook error:', err) }
+    // 7. Send code fix webhook
+    if (task.codeFixWebhookUrl) {
+      try { await sendCodeFixWebhook(taskId) } catch (err) { console.error('Code fix webhook error:', err) }
     }
 
     console.log(`[CodeFix ${taskId}] Code fix analysis complete`)
@@ -527,9 +527,9 @@ export async function runCodeFixAnalysis(taskId: string): Promise<void> {
 
     // Still send webhook on failure so consumer knows
     try {
-      const task = await prisma.task.findUnique({ where: { id: taskId }, select: { webhookUrl: true } })
-      if (task?.webhookUrl) {
-        await sendWebhook(taskId)
+      const task = await prisma.task.findUnique({ where: { id: taskId }, select: { codeFixWebhookUrl: true } })
+      if (task?.codeFixWebhookUrl) {
+        await sendCodeFixWebhook(taskId)
       }
     } catch {}
   } finally {

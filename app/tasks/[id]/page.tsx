@@ -65,6 +65,7 @@ export default async function TaskDetailPage({
         reportStatus: task.reportStatus,
         codeFixStatus: task.codeFixStatus,
         codeFixPrUrl: task.codeFixPrUrl,
+        repoUrl: task.repoUrl,
         createdAt: task.createdAt.toISOString(),
         claimedCount: task._count.claims,
         submittedCount: task._count.feedbacks,

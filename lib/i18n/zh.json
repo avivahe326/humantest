@@ -172,7 +172,9 @@
     "codeFixNote": "正在克隆并分析你的仓库，将根据可用性问题生成修复建议。这可能需要几分钟。",
     "codeFixFailed": "代码修复分析失败。报告仍然可以在上方查看。",
     "codeFixPr": "已自动创建修复 PR！",
-    "viewPr": "查看 Pull Request"
+    "viewPr": "查看 Pull Request",
+    "generateCodeFix": "生成代码修复 PR",
+    "generatingCodeFix": "正在生成代码修复..."
   },
   "submit": {
     "loading": "加载中...",

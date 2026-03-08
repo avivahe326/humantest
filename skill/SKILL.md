@@ -87,9 +87,14 @@ Response (when completed):
   "taskId": "cm...",
   "status": "COMPLETED",
   "submittedCount": 5,
-  "report": "## Executive Summary\n..."
+  "report": "## Executive Summary\n...",
+  "reportStatus": "COMPLETED",
+  "codeFixStatus": "COMPLETED",
+  "codeFixPrUrl": "https://github.com/user/repo/pull/1"
 }
 ```
+
+> **Note for agents:** When polling status, if `reportStatus` is `COMPLETED` and `repoUrl` was provided, the platform auto-triggers code fix generation. Keep polling until `codeFixStatus` is `COMPLETED` or `FAILED`.
 
 ## Parameters
 
@@ -102,22 +107,44 @@ Response (when completed):
 | `estimatedMinutes` | No | 10 | Expected test duration |
 | `creator` | No | admin | Name of the agent/user creating the task (auto-creates a user if needed) |
 | `webhookUrl` | No | — | HTTPS URL to receive the report on completion |
+| `codeFixWebhookUrl` | No | — | HTTPS URL to receive code fix results on completion |
 | `repoUrl` | No | — | GitHub repo URL for code-level fix suggestions |
 | `repoBranch` | No | repo default | Branch to analyze (only used with repoUrl) |
 
-## Async webhook
+## Async webhooks
 
-If you provide a `webhookUrl`, the platform will POST the full report to that URL when all testers have submitted:
+There are two separate webhooks for the two stages:
+
+### Report webhook (`webhookUrl`)
+
+If you provide a `webhookUrl`, the platform will POST the report to that URL when it's ready:
 
 ```json
 {
+  "event": "report",
   "taskId": "...",
   "status": "COMPLETED",
   "title": "Test: example.com",
   "targetUrl": "https://example.com",
   "report": "## Executive Summary\n...",
-  "codeFixPrUrl": "https://github.com/user/repo/pull/1",
   "completedAt": "2026-03-02T12:00:00Z"
+}
+```
+
+### Code fix webhook (`codeFixWebhookUrl`)
+
+If you provide a `codeFixWebhookUrl`, the platform will POST the code fix result when done:
+
+```json
+{
+  "event": "code_fix",
+  "taskId": "...",
+  "status": "COMPLETED",
+  "title": "Test: example.com",
+  "targetUrl": "https://example.com",
+  "codeFixStatus": "COMPLETED",
+  "codeFixPrUrl": "https://github.com/user/repo/pull/1",
+  "completedAt": "2026-03-02T12:30:00Z"
 }
 ```
 
@@ -211,7 +238,8 @@ curl -X POST BASE_URL/api/skill/human-test \
     "focus": "Test the checkout flow",
     "repoUrl": "https://github.com/your-org/your-repo",
     "repoBranch": "main",
-    "webhookUrl": "https://your-server.com/webhook"
+    "webhookUrl": "https://your-server.com/webhook",
+    "codeFixWebhookUrl": "https://your-server.com/code-fix-webhook"
   }'
 ```
 

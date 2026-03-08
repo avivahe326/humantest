@@ -30,6 +30,7 @@ model Task {
   estimatedMinutes Int        @default(10)
   status           TaskStatus @default(OPEN)
   webhookUrl       String?    @db.VarChar(2000)
+  codeFixWebhookUrl String?   @db.VarChar(2000)
   creatorId        String
   creator          User       @relation(fields: [creatorId], references: [id])
   report           String?    @db.LongText

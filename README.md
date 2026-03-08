@@ -10,6 +10,14 @@ Real human usability testing for AI-built products. Let AI hire humans to test y
 4. AI aggregates all feedback into a structured report with severity-ranked findings
 5. (Optional) If you provide a repo URL, the platform generates code-level fix suggestions and can auto-create a PR
 
+### Two-stage workflow
+
+Report generation and code fix are separate stages:
+1. **Generate Report** — AI aggregates tester feedback into a structured usability report
+2. **Generate Code Fix PR** — AI analyzes your repo against the report issues and creates a PR (requires `repoUrl`)
+
+Each stage has its own webhook: `webhookUrl` fires after the report, `codeFixWebhookUrl` fires after the code fix.
+
 ## Quick Start
 
 ```bash
@@ -131,7 +139,8 @@ curl -X POST http://localhost:3000/api/skill/human-test \
     "focus": "Test the onboarding flow",
     "maxTesters": 5,
     "repoUrl": "https://github.com/you/repo",
-    "webhookUrl": "https://your-server.com/webhook"
+    "webhookUrl": "https://your-server.com/webhook",
+    "codeFixWebhookUrl": "https://your-server.com/code-fix-webhook"
   }'
 ```
 

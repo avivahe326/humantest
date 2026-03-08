@@ -48,6 +48,7 @@ interface TaskDetailProps {
     reportStatus: string | null
     codeFixStatus: string | null
     codeFixPrUrl: string | null
+    repoUrl: string | null
     createdAt: string
     claimedCount: number
     submittedCount: number
@@ -156,6 +157,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const [claiming, setClaiming] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [generatingReport, setGeneratingReport] = useState(false)
+  const [generatingCodeFix, setGeneratingCodeFix] = useState(false)
   const [error, setError] = useState('')
   const [reportStatus, setReportStatus] = useState(task.reportStatus)
   const [report, setReport] = useState(task.report)
@@ -310,6 +312,28 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
     }
   }
 
+  async function handleGenerateCodeFix() {
+    setGeneratingCodeFix(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/generate-code-fix`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json()
+        if (res.status === 409) {
+          setCodeFixStatus('GENERATING')
+        } else {
+          setError(data.error || 'Failed to start code fix generation')
+        }
+        return
+      }
+      setCodeFixStatus('GENERATING')
+    } catch {
+      setError(t('common.somethingWrong'))
+    } finally {
+      setGeneratingCodeFix(false)
+    }
+  }
+
   const analysisCompleted = feedbackStatuses.filter(f => f.mediaAnalysisStatus === 'COMPLETED' || f.mediaAnalysisStatus === 'FAILED').length
   const analysisTotal = feedbackStatuses.length
   const allAnalysesDone = analysisTotal > 0 && analysisCompleted === analysisTotal
@@ -390,6 +414,11 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
             {task.submittedCount >= 1 && !report && !isGenerating && reportStatus !== 'GENERATING' && (
               <Button onClick={() => handleGenerateReport()} disabled={generatingReport} variant="secondary">
                 {generatingReport ? t('taskDetail.starting') : t('taskDetail.generateReport')}
+              </Button>
+            )}
+            {report && task.repoUrl && !codeFixPrUrl && !isCodeFixing && codeFixStatus !== 'GENERATING' && (
+              <Button onClick={handleGenerateCodeFix} disabled={generatingCodeFix} variant="secondary">
+                {generatingCodeFix ? t('taskDetail.starting') : t('taskDetail.generateCodeFix')}
               </Button>
             )}
             {(task.status === 'OPEN' || task.status === 'IN_PROGRESS') && (

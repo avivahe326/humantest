@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
         estimatedMinutes: data.estimatedMinutes ?? 10,
         locale,
         webhookUrl: data.webhookUrl,
+        codeFixWebhookUrl: data.codeFixWebhookUrl,
         repoUrl: data.repoUrl,
         repoBranch: data.repoBranch,
         creatorId,

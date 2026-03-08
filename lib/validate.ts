@@ -28,6 +28,7 @@ export const createTaskSchema = z.object({
   maxTesters: z.number().int().min(1).max(50).optional(),
   estimatedMinutes: z.number().int().min(1).max(120).optional(),
   webhookUrl: z.url().optional(),
+  codeFixWebhookUrl: z.url().optional(),
   repoUrl: z.string().max(2000).optional(),
   repoBranch: z.string().max(200).optional(),
   locale: z.enum(['en', 'zh']).optional(),

@@ -1,6 +1,6 @@
 import { chat } from '@/lib/ai-client'
 import { prisma } from '@/lib/prisma'
-import { sendWebhook } from '@/lib/webhook'
+import { sendReportWebhook } from '@/lib/webhook'
 import { analyzeMediaForFeedback, generateAggregateReport } from '@/lib/gemini'
 import { runCodeFixAnalysis } from '@/lib/code-fixer'
 import { getLanguageInstruction } from '@/lib/ai-locale'
@@ -148,11 +148,8 @@ export async function generateReport(taskId: string): Promise<string> {
       where: { id: taskId, report: null },
       data: { report, reportStatus: 'COMPLETED' },
     })
-    if (task.repoUrl) {
-      await prisma.task.update({ where: { id: taskId }, data: { codeFixStatus: 'GENERATING' } })
-      runCodeFixAnalysis(taskId).catch(err => console.error('Code fix error:', err))
-    } else if (task.webhookUrl) {
-      try { await sendWebhook(taskId) } catch (err) { console.error('Webhook error:', err) }
+    if (task.webhookUrl) {
+      try { await sendReportWebhook(taskId) } catch (err) { console.error('Report webhook error:', err) }
     }
     return report
   }
@@ -219,11 +216,8 @@ export async function generateReport(taskId: string): Promise<string> {
     data: { report, reportStatus: 'COMPLETED' },
   })
 
-  if (task.repoUrl) {
-    await prisma.task.update({ where: { id: taskId }, data: { codeFixStatus: 'GENERATING' } })
-    runCodeFixAnalysis(taskId).catch(err => console.error('Code fix error:', err))
-  } else if (task.webhookUrl) {
-    try { await sendWebhook(taskId) } catch (err) { console.error('Webhook error:', err) }
+  if (task.webhookUrl) {
+    try { await sendReportWebhook(taskId) } catch (err) { console.error('Report webhook error:', err) }
   }
 
   console.log(`[Report ${taskId}] Report generation complete`)
@@ -256,6 +250,35 @@ export function startReportGeneration(taskId: string): void {
       data: { reportStatus: 'FAILED' },
     }).catch((updateErr) => {
       console.error('Failed to set FAILED status for task:', taskId, updateErr)
+    })
+  })
+}
+
+export function startCodeFixGeneration(taskId: string): void {
+  prisma.task.updateMany({
+    where: {
+      id: taskId,
+      report: { not: null },
+      repoUrl: { not: null },
+      OR: [
+        { codeFixStatus: null },
+        { codeFixStatus: { in: ['FAILED', 'COMPLETED'] } },
+      ],
+    },
+    data: { codeFixStatus: 'GENERATING' },
+  }).then((result) => {
+    if (result.count === 0) {
+      console.log('Code fix generation already in progress or not eligible for task:', taskId)
+      return
+    }
+    return runCodeFixAnalysis(taskId)
+  }).catch((err) => {
+    console.error('Code fix generation failed for task:', taskId, err)
+    prisma.task.update({
+      where: { id: taskId },
+      data: { codeFixStatus: 'FAILED' },
+    }).catch((updateErr) => {
+      console.error('Failed to set code fix FAILED status for task:', taskId, updateErr)
     })
   })
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireApiKey } from '@/lib/require-api-key'
 import { prisma } from '@/lib/prisma'
 import { withCors, corsOptionsResponse } from '@/lib/cors'
+import { startCodeFixGeneration } from '@/lib/ai-report'
 
 export async function OPTIONS() {
   return corsOptionsResponse()
@@ -33,6 +34,11 @@ export async function GET(
     return withCors(NextResponse.json({ error: 'Not authorized' }, { status: 403 }))
   }
 
+  // Auto-trigger code fix for agents: when report is done + repoUrl exists + codeFixStatus is null
+  if (task.reportStatus === 'COMPLETED' && task.report && task.repoUrl && !task.codeFixStatus) {
+    startCodeFixGeneration(task.id)
+  }
+
   const claimedCount = task.claims.length
   const submittedCount = task.feedbacks.length
 
@@ -44,5 +50,8 @@ export async function GET(
     claimedCount,
     submittedCount,
     report: task.report,
+    reportStatus: task.reportStatus,
+    codeFixStatus: task.codeFixStatus,
+    codeFixPrUrl: task.codeFixPrUrl,
   }))
 }
