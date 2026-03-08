@@ -111,6 +111,25 @@ async function findRelevantFiles(
 ): Promise<{ path: string; content: string }[]> {
   const allFiles = await walkSourceFiles(repoDir)
 
+  // Read all files (skip very large ones)
+  const readableFiles: { path: string; content: string }[] = []
+  for (const relPath of allFiles) {
+    const fullPath = join(repoDir, relPath)
+    let content: string
+    try {
+      content = await readFile(fullPath, 'utf-8')
+    } catch {
+      continue
+    }
+    if (content.length > 100_000) continue
+    readableFiles.push({ path: relPath, content })
+  }
+
+  // If the repo has few files, include all of them (no keyword filtering needed)
+  if (readableFiles.length <= maxFiles) {
+    return readableFiles
+  }
+
   // Extract keywords from issue recommendations and titles
   const keywords = issues.flatMap(issue => {
     const text = `${issue.title} ${issue.recommendation}`.toLowerCase()
@@ -123,17 +142,7 @@ async function findRelevantFiles(
   // Score each file by keyword matches in path + content
   const scored: { path: string; content: string; score: number }[] = []
 
-  for (const relPath of allFiles) {
-    const fullPath = join(repoDir, relPath)
-    let content: string
-    try {
-      content = await readFile(fullPath, 'utf-8')
-    } catch {
-      continue
-    }
-    // Skip very large files
-    if (content.length > 100_000) continue
-
+  for (const { path: relPath, content } of readableFiles) {
     const lowerPath = relPath.toLowerCase()
     const lowerContent = content.toLowerCase()
     let score = 0
@@ -148,6 +157,12 @@ async function findRelevantFiles(
     if (score > 0) {
       scored.push({ path: relPath, content, score })
     }
+  }
+
+  // If keyword matching found nothing (e.g. report in different language than code),
+  // fall back to including all files up to maxFiles
+  if (scored.length === 0) {
+    return readableFiles.slice(0, maxFiles)
   }
 
   scored.sort((a, b) => b.score - a.score)
