@@ -1,15 +1,15 @@
 ---
 name: human_test
 slug: human-test
-description: "Call real humans to test your product. Get structured usability feedback with NPS scores, step-by-step task reports, and AI-aggregated findings."
-summary: "human_test() — hire real humans to test any URL. Returns an AI-generated usability report with NPS analysis and actionable recommendations."
+description: "Call real humans to test your product (URL or app). Get structured usability feedback with screen recordings, NPS scores, and AI-aggregated findings."
+summary: "human_test() — hire real humans to test any product. Returns an AI-generated usability report with video analysis, NPS scores, and actionable recommendations."
 tags:
   - testing
   - usability
   - feedback
   - ux-research
   - human-in-the-loop
-version: 1.0.0
+version: 1.6.0
 ---
 
 # human_test() — Real Human Feedback for AI Products
@@ -18,11 +18,11 @@ AI agents cannot judge human perception, emotion, or usability. This skill lets 
 
 ## What it does
 
-1. You call `human_test()` with a product URL
+1. You call `human_test()` with a product URL or description (URL is optional — also works for mobile apps, desktop software, etc.)
 2. AI auto-generates a structured test plan
 3. Real human testers claim the task on the web platform
-4. Each tester completes a 3-step guided feedback flow (first impression, task steps, NPS rating)
-5. AI aggregates all feedback into a structured report with severity-ranked findings
+4. Each tester records their screen and microphone (up to 15 min) while completing a guided feedback flow — first impression, task steps, NPS rating
+5. AI analyzes each recording via Gemini (frame extraction + audio transcription), then aggregates all feedback into a structured report with severity-ranked findings
 
 ## Setup
 
@@ -100,7 +100,7 @@ Response (when completed):
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `url` | Yes | — | Product URL to test |
+| `url` | No | — | Product URL to test (optional — leave empty for mobile apps or non-web products) |
 | `title` | No | Auto from hostname | Task title |
 | `focus` | No | — | What testers should focus on |
 | `maxTesters` | No | 5 | Number of testers (1-50) |
@@ -110,6 +110,7 @@ Response (when completed):
 | `codeFixWebhookUrl` | No | — | HTTPS URL to receive code fix results on completion |
 | `repoUrl` | No | — | GitHub repo URL for code-level fix suggestions |
 | `repoBranch` | No | repo default | Branch to analyze (only used with repoUrl) |
+| `locale` | No | `en` | Report language: `en` (English) or `zh` (Chinese) |
 
 ## Async webhooks
 
