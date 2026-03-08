@@ -7,7 +7,7 @@ Real human usability testing for AI-built products. Let AI hire humans to test y
 1. You call `human_test()` with a product URL or description (via the web form, API, or AI agent skill)
 2. AI auto-generates a structured test plan
 3. Real human testers claim the task and provide guided feedback — first impression, task steps, NPS rating, screen recording with audio narration
-4. AI analyzes each recording via Gemini (frame extraction + audio transcription), then aggregates all feedback into a structured report with severity-ranked findings
+4. AI extracts key frames from each recording (via ffmpeg) and uses the configured AI provider's vision capability to analyze usability issues, then aggregates all feedback into a structured report with severity-ranked findings
 5. (Optional) If you provide a repo URL, the platform clones your code, generates file-level fix suggestions, and can auto-create a PR
 
 URL is optional — you can also test mobile apps, desktop software, or anything with a description.
@@ -15,7 +15,7 @@ URL is optional — you can also test mobile apps, desktop software, or anything
 ### Two-stage workflow
 
 Report generation and code fix are separate stages:
-1. **Generate Report** — AI analyzes recordings via Gemini, then aggregates all tester feedback into a structured usability report
+1. **Generate Report** — AI extracts key frames from recordings, analyzes them with vision AI, then aggregates all tester feedback into a structured usability report
 2. **Generate Code Fix PR** — AI clones your repo, analyzes code against report issues, and creates a PR (requires `repoUrl`)
 
 Each stage has its own webhook: `webhookUrl` fires after the report, `codeFixWebhookUrl` fires after the code fix.
@@ -24,8 +24,8 @@ Each stage has its own webhook: `webhookUrl` fires after the report, `codeFixWeb
 
 Testers record their screen and microphone directly in the browser (up to 15 minutes). Recordings are uploaded to local disk or Alibaba Cloud OSS. The platform then:
 
-1. **Phase 1** — Analyzes each recording individually via Google Gemini (extracts key frames, transcribes audio narration, identifies usability issues)
-2. **Phase 2** — Aggregates all individual analyses + text feedback into a structured report via Claude/OpenAI
+1. **Phase 1** — Extracts key frames from each recording (every 3 seconds via ffmpeg), then uses the configured AI provider's vision capability to analyze each tester's session (identifies usability issues, confusion points, navigation patterns)
+2. **Phase 2** — Aggregates all individual analyses + text feedback into a structured report via the same AI provider
 
 If a tester's recording fails or is skipped, their text feedback is still included in the report.
 
@@ -144,9 +144,9 @@ Next.js 16 + Prisma + NextAuth + Tailwind CSS
 │   ├── settings/           # User API key + admin settings page
 │   └── onboarding/         # Post-registration guided onboarding
 ├── lib/
-│   ├── ai-report.ts        # Report generation (Claude/OpenAI + Gemini media analysis)
+│   ├── ai-report.ts        # Report generation (two-phase media + text analysis)
+│   ├── media-analysis.ts   # Video frame extraction (ffmpeg) and AI vision analysis
 │   ├── code-fixer.ts       # Repo-aware code fix suggestions + auto-PR
-│   ├── gemini.ts           # Video/audio frame extraction and analysis
 │   ├── webhook.ts          # Webhook delivery
 │   ├── validate.ts         # Zod schemas for input validation
 │   ├── rate-limit.ts       # Per-endpoint rate limiting

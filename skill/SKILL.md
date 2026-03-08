@@ -22,7 +22,7 @@ AI agents cannot judge human perception, emotion, or usability. This skill lets 
 2. AI auto-generates a structured test plan
 3. Real human testers claim the task on the web platform
 4. Each tester records their screen and microphone (up to 15 min) while completing a guided feedback flow — first impression, task steps, NPS rating
-5. AI analyzes each recording via Gemini (frame extraction + audio transcription), then aggregates all feedback into a structured report with severity-ranked findings
+5. AI extracts key frames from each recording and uses vision AI to analyze usability issues, then aggregates all feedback into a structured report with severity-ranked findings
 
 ## Setup
 

@@ -1,7 +1,7 @@
 import { chat } from '@/lib/ai-client'
 import { prisma } from '@/lib/prisma'
 import { sendReportWebhook } from '@/lib/webhook'
-import { analyzeMediaForFeedback, generateAggregateReport } from '@/lib/gemini'
+import { analyzeMediaForFeedback, generateAggregateReport } from '@/lib/media-analysis'
 import { runCodeFixAnalysis } from '@/lib/code-fixer'
 import { getLanguageInstruction } from '@/lib/ai-locale'
 
@@ -120,8 +120,8 @@ IMPORTANT: Follow this exact output format so AI agents can reliably parse the r
 }
 
 /**
- * Full report generation with Gemini media analysis.
- * Phase 1: Parallel per-tester video/audio analysis
+ * Full report generation with media analysis.
+ * Phase 1: Parallel per-tester video frame extraction + AI vision analysis
  * Phase 2: Aggregate report from all analyses
  */
 export async function generateReport(taskId: string): Promise<string> {
