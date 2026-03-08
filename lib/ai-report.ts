@@ -151,6 +151,10 @@ export async function generateReport(taskId: string): Promise<string> {
     if (task.webhookUrl) {
       try { await sendReportWebhook(taskId) } catch (err) { console.error('Report webhook error:', err) }
     }
+    // Auto-trigger code fix if repoUrl is configured
+    if (task.repoUrl) {
+      startCodeFixGeneration(taskId)
+    }
     return report
   }
 
@@ -218,6 +222,11 @@ export async function generateReport(taskId: string): Promise<string> {
 
   if (task.webhookUrl) {
     try { await sendReportWebhook(taskId) } catch (err) { console.error('Report webhook error:', err) }
+  }
+
+  // Auto-trigger code fix if repoUrl is configured
+  if (task.repoUrl) {
+    startCodeFixGeneration(taskId)
   }
 
   console.log(`[Report ${taskId}] Report generation complete`)
