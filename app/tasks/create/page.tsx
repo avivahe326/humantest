@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,14 @@ interface TestStep {
 }
 
 export default function CreateTaskPage() {
+  return (
+    <Suspense>
+      <CreateTaskForm />
+    </Suspense>
+  )
+}
+
+function CreateTaskForm() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
