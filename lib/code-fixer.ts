@@ -343,7 +343,7 @@ async function tryCreatePR(
     return null
   }
 
-  const branchName = `human-test/fixes-${taskId}`
+  const branchName = `human-test/fixes-${taskId}-${Date.now()}`
 
   try {
     // Create branch
