@@ -94,7 +94,7 @@ Response (when completed):
 }
 ```
 
-> **Note for agents:** When polling status, if `reportStatus` is `COMPLETED` and `repoUrl` was provided, the platform auto-triggers code fix generation. Keep polling until `codeFixStatus` is `COMPLETED` or `FAILED`.
+> **Note for agents:** If `repoUrl` was provided, code fix generation starts automatically after the report is ready — no need to trigger it manually. Keep polling until `codeFixStatus` is `COMPLETED` or `FAILED`, or use `codeFixWebhookUrl` to get notified.
 
 ## Parameters
 
@@ -220,7 +220,7 @@ Each issue's **Evidence** tells you what went wrong, **Impact** tells you why it
 
 ## Repo-aware code fix suggestions
 
-If you pass a `repoUrl`, the platform will clone your repo after the report is generated and produce **file-level code fix suggestions** (with unified diffs) appended to the report as a `## Code Fix Suggestions` section.
+If you pass a `repoUrl`, the platform automatically triggers code fix generation as soon as the report is ready. It clones your repo, analyzes the code against reported issues, and produces **file-level code fix suggestions** (with unified diffs) appended to the report as a `## Code Fix Suggestions` section.
 
 ### Two modes (auto-detected)
 
