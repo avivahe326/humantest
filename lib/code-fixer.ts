@@ -251,8 +251,9 @@ async function tryCreatePR(
     await execFileAsync('git', [
       'push', '--dry-run', 'origin', 'HEAD',
     ], { cwd: repoDir, timeout: 15000 })
-  } catch {
+  } catch (err) {
     // No write access — Mode 1
+    console.log(`[CodeFix ${taskId}] No write access (dry-run push failed):`, (err as Error).message)
     return null
   }
 
@@ -264,6 +265,7 @@ async function tryCreatePR(
 
     // Extract diffs from suggestions and try to apply them
     const diffBlocks = extractDiffsFromSuggestions(suggestions)
+    console.log(`[CodeFix ${taskId}] Extracted ${diffBlocks.length} diff blocks`)
     if (diffBlocks.length === 0) return null
 
     let appliedAny = false
@@ -276,7 +278,10 @@ async function tryCreatePR(
       }
     }
 
-    if (!appliedAny) return null
+    if (!appliedAny) {
+      console.log(`[CodeFix ${taskId}] No diffs could be applied, skipping PR`)
+      return null
+    }
 
     const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
 
@@ -492,7 +497,7 @@ export async function runCodeFixAnalysis(taskId: string): Promise<void> {
       if (prUrl) {
         console.log(`[CodeFix ${taskId}] PR created: ${prUrl}`)
       } else {
-        console.log(`[CodeFix ${taskId}] Mode 1 (read-only): no PR created`)
+        console.log(`[CodeFix ${taskId}] No PR created (read-only or diffs failed to apply)`)
       }
     } catch (err) {
       console.warn(`[CodeFix ${taskId}] PR creation failed:`, err)
