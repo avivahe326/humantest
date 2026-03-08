@@ -36,6 +36,9 @@
     "startTestingEarning": "开始测试",
     "realReportExample": "示例报告（Agent 可解析）",
     "realReportDesc": "这是来自我们平台的真实 AI 生成报告。报告使用一致的 Markdown 结构，包含严重程度标签、证据字段和优先级标签 — 你的 AI Agent 可以直接读取并执行：",
+    "quickFocusPlaceholder": "测试者应该关注什么？（可选）",
+    "quickCreate": "创建测试",
+    "skillAlt": "使用 AI 编程工具？安装为技能：",
     "footerTagline": "为 AI 构建的产品提供真人反馈。"
   },
   "login": {

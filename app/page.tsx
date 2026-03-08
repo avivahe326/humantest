@@ -1,8 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import Image from 'next/image'
 import { SampleReport } from './sample-report'
 import { CopyButton } from './copy-button'
@@ -10,6 +14,17 @@ import { useTranslation } from '@/lib/i18n'
 
 export default function LandingPage() {
   const { t } = useTranslation()
+  const router = useRouter()
+  const [quickUrl, setQuickUrl] = useState('')
+  const [quickFocus, setQuickFocus] = useState('')
+
+  function handleQuickCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!quickUrl) return
+    const params = new URLSearchParams({ url: quickUrl })
+    if (quickFocus) params.set('focus', quickFocus)
+    router.push(`/tasks/create?${params.toString()}`)
+  }
 
   return (
     <div className="space-y-24 pb-16">
@@ -22,39 +37,49 @@ export default function LandingPage() {
         <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
           {t('landing.heroSubtitle')}
         </p>
-        <div className="flex gap-4">
-          <Link href="/register">
-            <Button size="lg">{t('landing.getStarted')}</Button>
-          </Link>
-          <Link href="/tasks">
-            <Button size="lg" variant="outline">{t('landing.browseTests')}</Button>
-          </Link>
-        </div>
-      </section>
 
-      {/* Install as Agent Skill */}
-      <section className="space-y-6 text-center">
-        <h2 className="text-2xl font-bold">{t('landing.installSkill')}</h2>
-        <p className="mx-auto max-w-xl text-muted-foreground">
-          {t('landing.installSkillDesc')}
-        </p>
-        <Card className="mx-auto max-w-lg">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 rounded bg-muted p-4">
-              <pre className="flex-1 text-sm overflow-x-auto"><code>npx skills add avivahe326/human-test-skill</code></pre>
-              <CopyButton text="npx skills add avivahe326/human-test-skill" />
-            </div>
-          </CardContent>
-        </Card>
-        <p className="text-xs text-muted-foreground">
-          {t('landing.poweredBy', { link: '' }).split('').length > 0 && (
-            <>
-              {t('landing.poweredBy', { link: '__LINK__' }).split('__LINK__')[0]}
-              <a href="https://skills.sh" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">skills.sh</a>
-              {t('landing.poweredBy', { link: '__LINK__' }).split('__LINK__')[1]}
-            </>
-          )}
-        </p>
+        {/* Quick Test Form */}
+        <form onSubmit={handleQuickCreate} className="w-full max-w-lg space-y-3">
+          <Input
+            value={quickUrl}
+            onChange={e => setQuickUrl(e.target.value)}
+            placeholder="https://your-product.com"
+            required
+            type="url"
+            className="h-12 text-base"
+          />
+          <Textarea
+            value={quickFocus}
+            onChange={e => setQuickFocus(e.target.value)}
+            placeholder={t('landing.quickFocusPlaceholder')}
+            rows={2}
+            className="resize-none"
+          />
+          <Button type="submit" size="lg" className="w-full" disabled={!quickUrl}>
+            {t('landing.quickCreate')}
+          </Button>
+        </form>
+        <Link href="/tasks" className="text-sm text-muted-foreground hover:text-primary underline">
+          {t('landing.browseTests')}
+        </Link>
+
+        {/* Skill install — secondary */}
+        <div className="mt-4 space-y-2 text-center">
+          <p className="text-sm text-muted-foreground">{t('landing.skillAlt')}</p>
+          <div className="mx-auto flex max-w-lg items-center gap-2 rounded bg-muted p-3">
+            <pre className="flex-1 text-sm overflow-x-auto"><code>npx skills add avivahe326/human-test-skill</code></pre>
+            <CopyButton text="npx skills add avivahe326/human-test-skill" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t('landing.poweredBy', { link: '' }).split('').length > 0 && (
+              <>
+                {t('landing.poweredBy', { link: '__LINK__' }).split('__LINK__')[0]}
+                <a href="https://skills.sh" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">skills.sh</a>
+                {t('landing.poweredBy', { link: '__LINK__' }).split('__LINK__')[1]}
+              </>
+            )}
+          </p>
+        </div>
       </section>
 
       {/* How It Works */}

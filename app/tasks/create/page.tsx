@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +20,7 @@ interface TestStep {
 export default function CreateTaskPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [error, setError] = useState('')
@@ -34,6 +35,36 @@ export default function CreateTaskPage() {
   const [repoUrl, setRepoUrl] = useState('')
   const [repoBranch, setRepoBranch] = useState('')
   const [repoOpen, setRepoOpen] = useState(false)
+  const [autoPreviewDone, setAutoPreviewDone] = useState(false)
+
+  // Pre-fill from URL params (landing page quick form)
+  useEffect(() => {
+    const paramUrl = searchParams.get('url')
+    const paramFocus = searchParams.get('focus')
+    if (paramUrl) setUrl(paramUrl)
+    if (paramFocus) setFocus(paramFocus)
+  }, [searchParams])
+
+  // Auto-trigger preview when pre-filled from URL params
+  useEffect(() => {
+    if (url && searchParams.get('url') && !autoPreviewDone && session) {
+      setAutoPreviewDone(true)
+      setPreviewLoading(true)
+      setError('')
+      fetch('/api/ai/generate-test-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, focus, estimatedMinutes: estimatedMinutes || 10, locale }),
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to generate plan')
+          return res.json()
+        })
+        .then(plan => setSteps(plan.steps || []))
+        .catch(() => setError(t('createTask.generateFailed')))
+        .finally(() => setPreviewLoading(false))
+    }
+  }, [url, session]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (status === 'loading') return null
   if (!session) {

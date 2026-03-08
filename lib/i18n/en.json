@@ -36,6 +36,9 @@
     "startTestingEarning": "Start Testing",
     "realReportExample": "Sample Report (Agent-Parseable)",
     "realReportDesc": "This is a real AI-generated report from our platform. Reports use consistent markdown structure with severity tags, evidence fields, and priority labels — so your AI agent can read and act on them directly:",
+    "quickFocusPlaceholder": "What should testers focus on? (optional)",
+    "quickCreate": "Create Test",
+    "skillAlt": "Using an AI coding tool? Install as a skill:",
     "footerTagline": "Real human feedback for AI-built products."
   },
   "login": {
