@@ -60,6 +60,29 @@ function run(cmd, opts = {}) {
   }
 }
 
+function runAsync(cmd, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('sh', ['-c', cmd], { stdio: 'pipe', ...opts })
+    let stderr = ''
+    if (child.stderr) child.stderr.on('data', d => stderr += d)
+    child.on('close', code => {
+      if (code !== 0 && !opts.ignoreError) {
+        console.error(`\n  Command failed: ${cmd}`)
+        if (stderr) console.error(stderr)
+        process.exit(1)
+      }
+      resolve()
+    })
+    child.on('error', err => {
+      if (!opts.ignoreError) {
+        console.error(`\n  Command failed: ${cmd}\n  ${err.message}`)
+        process.exit(1)
+      }
+      resolve()
+    })
+  })
+}
+
 function runCapture(cmd, opts = {}) {
   try {
     return execSync(cmd, { encoding: 'utf-8', ...opts }).trim()
@@ -362,7 +385,7 @@ async function init() {
   // ─── Clone repo ───
   const s = p.spinner()
   s.start('Downloading human_test()...')
-  run(`git clone --depth 1 ${REPO_URL} "${installDir}"`, { stdio: 'pipe' })
+  await runAsync(`git clone --depth 1 ${REPO_URL} "${installDir}"`)
   s.stop('Downloaded human_test()')
 
   // ─── Generate .env ───
@@ -431,12 +454,12 @@ async function init() {
 
   // ─── Install dependencies ───
   s.start('Installing dependencies...')
-  run('npm install', { cwd: installDir, stdio: 'pipe' })
+  await runAsync('npm install', { cwd: installDir })
   s.stop('Dependencies installed')
 
   // ─── Setup database ───
   s.start('Setting up database...')
-  run('npx prisma db push', { cwd: installDir, stdio: 'pipe' })
+  await runAsync('npx prisma db push', { cwd: installDir })
   s.stop('Database ready')
 
   // ─── Create admin user ───
@@ -447,7 +470,7 @@ async function init() {
 
   // ─── Build ───
   s.start('Building application...')
-  run('npm run build', { cwd: installDir, stdio: 'pipe' })
+  await runAsync('npm run build', { cwd: installDir })
   s.stop('Build complete')
 
   // ─── Ensure pm2 is available ───
