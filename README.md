@@ -1,8 +1,13 @@
 # human_test()
 
-[![npm](https://img.shields.io/npm/v/humantest-app)](https://www.npmjs.com/package/humantest-app)
+[![npm version](https://img.shields.io/npm/v/humantest-app?color=cb3837)](https://www.npmjs.com/package/humantest-app)
+[![npm downloads](https://img.shields.io/npm/dm/humantest-app?color=cb3837)](https://www.npmjs.com/package/humantest-app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![GitHub](https://img.shields.io/github/stars/avivahe326/humantest?style=social)](https://github.com/avivahe326/humantest)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/avivahe326/humantest/pulls)
+[![Skill](https://img.shields.io/badge/AI%20Skill-human__test()-8A2BE2)](https://github.com/avivahe326/human-test-skill)
 
 AI builds your product in minutes. But can real users actually use it?
 
