@@ -154,7 +154,6 @@ function CreateTaskForm() {
             value={url}
             onChange={e => setUrl(e.target.value)}
             placeholder={t('createTask.urlPlaceholder')}
-            required
           />
         </div>
 

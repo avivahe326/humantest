@@ -20,8 +20,8 @@ export default function LandingPage() {
 
   function handleQuickCreate(e: React.FormEvent) {
     e.preventDefault()
-    if (!quickUrl) return
-    const params = new URLSearchParams({ url: quickUrl })
+    const params = new URLSearchParams()
+    if (quickUrl) params.set('url', quickUrl)
     if (quickFocus) params.set('focus', quickFocus)
     router.push(`/tasks/create?${params.toString()}`)
   }
@@ -43,9 +43,7 @@ export default function LandingPage() {
           <Input
             value={quickUrl}
             onChange={e => setQuickUrl(e.target.value)}
-            placeholder="https://your-product.com"
-            required
-            type="url"
+            placeholder="https://your-product.com (optional)"
             className="h-12 text-base"
           />
           <Textarea
@@ -55,7 +53,7 @@ export default function LandingPage() {
             rows={2}
             className="resize-none"
           />
-          <Button type="submit" size="lg" className="w-full" disabled={!quickUrl}>
+          <Button type="submit" size="lg" className="w-full">
             {t('landing.quickCreate')}
           </Button>
         </form>
