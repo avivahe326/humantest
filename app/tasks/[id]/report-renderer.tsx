@@ -231,14 +231,129 @@ function countSeverities(issues: ParsedIssue[]): string {
 export { parseReport }
 export type { ParsedReport }
 
+interface ParsedCodeFix {
+  severity: string
+  title: string
+  file: string
+  lines: string
+  diff: string
+  explanation: string
+}
+
+function parseCodeFixes(content: string): ParsedCodeFix[] {
+  const fixes: ParsedCodeFix[] = []
+  const blocks = content.split(/^### /m).filter(Boolean)
+
+  for (const block of blocks) {
+    const lines = block.split('\n')
+    const headerLine = lines[0].trim()
+    const match = headerLine.match(/^\[?(CRITICAL|MAJOR|MINOR)\]?\s+(.+)/i)
+    if (!match) continue
+
+    const severity = match[1].toUpperCase()
+    const title = match[2]
+    const body = lines.slice(1).join('\n')
+
+    const fileMatch = body.match(/\*\*File:\*\*\s*`?([^`\n]+)`?/)
+    const linesMatch = body.match(/\*\*Lines?:\*\*\s*(.+)/)
+    const explMatch = body.match(/\*\*Explanation:\*\*\s*([\s\S]+?)(?=\n### |\n\*\*File:|\s*$)/)
+
+    // Extract diff block
+    const diffMatch = body.match(/```diff\n([\s\S]*?)```/)
+
+    fixes.push({
+      severity,
+      title,
+      file: fileMatch?.[1]?.trim() || '',
+      lines: linesMatch?.[1]?.trim() || '',
+      diff: diffMatch?.[1]?.trim() || '',
+      explanation: explMatch?.[1]?.trim() || '',
+    })
+  }
+
+  return fixes
+}
+
+function DiffBlock({ diff }: { diff: string }) {
+  const lines = diff.split('\n')
+  return (
+    <div className="rounded-md border border-border overflow-hidden text-xs font-mono">
+      {lines.map((line, i) => {
+        let bg = ''
+        let textColor = 'text-muted-foreground'
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          bg = 'bg-green-500/10'
+          textColor = 'text-green-400'
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+          bg = 'bg-red-500/10'
+          textColor = 'text-red-400'
+        } else if (line.startsWith('@@')) {
+          bg = 'bg-blue-500/10'
+          textColor = 'text-blue-400'
+        }
+        return (
+          <div key={i} className={`px-3 py-0.5 ${bg} ${textColor} whitespace-pre-wrap break-all`}>
+            {line || ' '}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function CodeFixCard({ fix }: { fix: ParsedCodeFix }) {
+  return (
+    <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
+      <div className="flex items-start gap-2">
+        <SeverityBadge severity={fix.severity} />
+        <h4 className="text-sm font-semibold leading-snug">{fix.title}</h4>
+      </div>
+      {(fix.file || fix.lines) && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {fix.file && (
+            <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{fix.file}</span>
+          )}
+          {fix.lines && (
+            <span>Lines {fix.lines}</span>
+          )}
+        </div>
+      )}
+      {fix.diff && <DiffBlock diff={fix.diff} />}
+      {fix.explanation && (
+        <div className="text-xs text-muted-foreground leading-relaxed">
+          <span className="font-semibold text-primary">Explanation: </span>
+          {fix.explanation}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function CodeFixRenderer({ content }: { content: string }) {
   if (!content) return null
-  return (
-    <div className="space-y-2">
-      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Code Fix Suggestions</h3>
-      <div className="text-sm prose prose-invert prose-sm max-w-none">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+
+  const fixes = parseCodeFixes(content)
+
+  // If parsing found structured fixes, render them as cards
+  if (fixes.length > 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {fixes.length} suggestion{fixes.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        {fixes.map((fix, i) => (
+          <CodeFixCard key={i} fix={fix} />
+        ))}
       </div>
+    )
+  }
+
+  // Fallback: render as markdown
+  return (
+    <div className="prose prose-invert prose-sm max-w-none">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   )
 }
