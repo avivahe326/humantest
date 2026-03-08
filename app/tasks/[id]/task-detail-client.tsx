@@ -516,7 +516,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
             )}
           </TabsList>
 
-          <TabsContent value="report" className="space-y-4 mt-4">
+          <TabsContent value="report" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
             {isGenerating && !report && (
               <Card>
                 <CardContent className="pt-6 space-y-3">
@@ -606,7 +606,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
           {/* Code Fix Tab */}
           {showCodeFixTabs && (
-            <TabsContent value="codefix" className="space-y-4 mt-4">
+            <TabsContent value="codefix" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
               {isCodeFixing && (
                 <Card>
                   <CardContent className="pt-6 space-y-3">
@@ -671,7 +671,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
           {/* Pull Request Tab */}
           {showCodeFixTabs && (
-            <TabsContent value="pr" className="space-y-4 mt-4">
+            <TabsContent value="pr" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
               {codeFixPrUrl ? (
                 <Card className="border-green-500/50">
                   <CardHeader>
