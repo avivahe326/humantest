@@ -19,6 +19,9 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<string | null>(null)
   const [toast, setToast] = useState('')
+  const [showAiKey, setShowAiKey] = useState(false)
+  const [showSmtpPass, setShowSmtpPass] = useState(false)
+  const [showGithubToken, setShowGithubToken] = useState(false)
   const { t } = useTranslation()
 
   const showToast = useCallback((msg: string) => {
@@ -72,6 +75,11 @@ export default function SettingsPage() {
 
   function updateSetting(key: string, value: string) {
     setSettings(prev => ({ ...prev, [key]: value }))
+  }
+
+  function maskSensitive(value: string): string {
+    if (!value || value.length <= 8) return value ? '****' : ''
+    return value.slice(0, 4) + '****' + value.slice(-4)
   }
 
   async function saveSection(sectionKey: string, keys: string[]) {
@@ -158,12 +166,19 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="text-sm font-medium">{t('settings.aiApiKey')}</label>
-                <Input
-                  type="password"
-                  value={settings.AI_API_KEY || ''}
-                  onChange={e => updateSetting('AI_API_KEY', e.target.value)}
-                  placeholder="sk-..."
-                />
+                <div className="mt-1 flex gap-2">
+                  <Input
+                    type={showAiKey ? 'text' : 'password'}
+                    value={showAiKey ? (settings.AI_API_KEY || '') : maskSensitive(settings.AI_API_KEY || '')}
+                    onChange={e => updateSetting('AI_API_KEY', e.target.value)}
+                    placeholder="sk-..."
+                    readOnly={!showAiKey}
+                    className="font-mono text-sm"
+                  />
+                  <Button variant="outline" size="sm" onClick={() => setShowAiKey(!showAiKey)}>
+                    {showAiKey ? t('settings.hide') : t('settings.show')}
+                  </Button>
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium">{t('settings.aiBaseUrl')}</label>
@@ -211,7 +226,18 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium">{t('settings.smtpPass')}</label>
-                  <Input type="password" value={settings.SMTP_PASS || ''} onChange={e => updateSetting('SMTP_PASS', e.target.value)} />
+                  <div className="mt-1 flex gap-2">
+                    <Input
+                      type={showSmtpPass ? 'text' : 'password'}
+                      value={showSmtpPass ? (settings.SMTP_PASS || '') : maskSensitive(settings.SMTP_PASS || '')}
+                      onChange={e => updateSetting('SMTP_PASS', e.target.value)}
+                      readOnly={!showSmtpPass}
+                      className="font-mono text-sm"
+                    />
+                    <Button variant="outline" size="sm" onClick={() => setShowSmtpPass(!showSmtpPass)}>
+                      {showSmtpPass ? t('settings.hide') : t('settings.show')}
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div>
@@ -239,7 +265,18 @@ export default function SettingsPage() {
               <hr className="my-2" />
               <div>
                 <label className="text-sm font-medium">{t('settings.githubToken')}</label>
-                <Input type="password" value={settings.GITHUB_TOKEN || ''} onChange={e => updateSetting('GITHUB_TOKEN', e.target.value)} />
+                <div className="mt-1 flex gap-2">
+                  <Input
+                    type={showGithubToken ? 'text' : 'password'}
+                    value={showGithubToken ? (settings.GITHUB_TOKEN || '') : maskSensitive(settings.GITHUB_TOKEN || '')}
+                    onChange={e => updateSetting('GITHUB_TOKEN', e.target.value)}
+                    readOnly={!showGithubToken}
+                    className="font-mono text-sm"
+                  />
+                  <Button variant="outline" size="sm" onClick={() => setShowGithubToken(!showGithubToken)}>
+                    {showGithubToken ? t('settings.hide') : t('settings.show')}
+                  </Button>
+                </div>
               </div>
 
               <Button

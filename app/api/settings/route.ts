@@ -4,17 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getAllSettings, setSetting } from '@/lib/settings'
 
-const SENSITIVE_KEYS = new Set([
-  'AI_API_KEY', 'ANTHROPIC_API_KEY', 'SMTP_PASS', 'GITHUB_TOKEN',
-])
-
-function maskValue(key: string, value: string): string {
-  if (SENSITIVE_KEYS.has(key) && value.length > 8) {
-    return value.slice(0, 4) + '****' + value.slice(-4)
-  }
-  return value
-}
-
 async function isAdmin(userId: string): Promise<boolean> {
   const firstUser = await prisma.user.findFirst({
     orderBy: { createdAt: 'asc' },
@@ -35,12 +24,7 @@ export async function GET() {
   }
 
   const settings = await getAllSettings()
-  const masked: Record<string, string> = {}
-  for (const [key, value] of Object.entries(settings)) {
-    masked[key] = maskValue(key, value)
-  }
-
-  return NextResponse.json({ settings: masked })
+  return NextResponse.json({ settings })
 }
 
 export async function POST(request: NextRequest) {
@@ -62,8 +46,6 @@ export async function POST(request: NextRequest) {
 
     for (const [key, value] of Object.entries(body)) {
       if (typeof key !== 'string' || key.length > 100) continue
-      // Skip masked values (user didn't change them)
-      if (typeof value === 'string' && value.includes('****')) continue
       if (typeof value === 'string') {
         await setSetting(key, value)
       }
