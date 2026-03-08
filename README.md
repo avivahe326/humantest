@@ -1,37 +1,23 @@
 # human_test()
 
-Real human usability testing for AI-built products. Let AI hire humans to test your product and get structured, agent-parseable feedback reports.
+[![npm](https://img.shields.io/npm/v/humantest-app)](https://www.npmjs.com/package/humantest-app)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub](https://img.shields.io/github/stars/avivahe326/humantest?style=social)](https://github.com/avivahe326/humantest)
 
-## What it does
+AI builds your product in minutes. But can real users actually use it?
 
-1. You call `human_test()` with a product URL or description (via the web form, API, or AI agent skill)
-2. AI auto-generates a structured test plan
-3. Real human testers claim the task and provide guided feedback — first impression, task steps, NPS rating, screen recording with audio narration
-4. AI extracts key frames from each recording (via ffmpeg) and uses the configured AI provider's vision capability to analyze usability issues, then aggregates all feedback into a structured report with severity-ranked findings
-5. (Optional) If you provide a repo URL, the platform clones your code, generates file-level fix suggestions, and can auto-create a PR
+**human_test()** closes the loop — your AI agent calls real humans to test, gets a structured usability report, and auto-fixes the issues. No manual QA, no guesswork.
 
-URL is optional — you can also test mobile apps, desktop software, or anything with a description.
+```
+You:   "Test my app at localhost:3000, focus on the signup flow"
+Agent: → calls human_test()
+       → 5 real humans test your product (screen recording + audio narration)
+       → AI analyzes recordings and generates a structured report
+       → 3 critical issues found, auto-generates fixes, creates PR #42
+```
 
-### Two-stage workflow
-
-Report generation and code fix are separate stages:
-1. **Generate Report** — AI extracts key frames from recordings, analyzes them with vision AI, then aggregates all tester feedback into a structured usability report
-2. **Generate Code Fix PR** — AI clones your repo, analyzes code against report issues, and creates a PR (requires `repoUrl`)
-
-Each stage has its own webhook: `webhookUrl` fires after the report, `codeFixWebhookUrl` fires after the code fix.
-
-### Screen recording & media analysis
-
-Testers record their screen and microphone directly in the browser (up to 15 minutes). Recordings are uploaded to local disk or Alibaba Cloud OSS. The platform then:
-
-1. **Phase 1** — Extracts key frames from each recording (every 3 seconds via ffmpeg), then uses the configured AI provider's vision capability to analyze each tester's session (identifies usability issues, confusion points, navigation patterns)
-2. **Phase 2** — Aggregates all individual analyses + text feedback into a structured report via the same AI provider
-
-If a tester's recording fails or is skipped, their text feedback is still included in the report.
-
-### Internationalization
-
-The platform supports English and Chinese. Language is auto-detected from the browser's `Accept-Language` header and can be toggled in the UI. Reports are generated in the language matching the task's locale.
+<!-- TODO: Add screenshot of a real report or dashboard here -->
+<!-- ![Report Screenshot](docs/images/report-screenshot.png) -->
 
 ## Quick Start
 
@@ -42,133 +28,26 @@ cd humantest
 humantest start
 ```
 
-The interactive setup wizard will guide you through configuration:
+Three commands. Local SQLite database, zero external dependencies. Open `http://localhost:3000` and create your first test task.
 
-- **Local mode**: SQLite database, zero config — great for dev/small teams
-- **Cloud mode**: MySQL database — for production deployments
-
-The wizard prompts for: database, AI provider, port, domain (cloud), SMTP, recording storage (OSS or local disk), and GitHub token.
-
-### Non-interactive setup
-
-For automated/agent-driven installs, use `--non-interactive`:
-
-```bash
-humantest init --non-interactive
-```
-
-This uses local mode (SQLite), auto-detects AI API keys from environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `GEMINI_API_KEY`), and runs on port 3000. A default admin user (`admin@humantest.local` / `admin`) is created automatically.
-
-### Default admin user
-
-Both interactive and non-interactive init create a default admin user:
-
-- **Email**: `admin@humantest.local`
-- **Password**: `admin`
-
-This user is used as the fallback when API requests are made without authentication. Change the password after first login in production.
-
-## Manual Setup
-
-```bash
-git clone https://github.com/avivahe326/humantest.git
-cd humantest
-cp .env.example .env
-# Edit .env with your settings
-npm install
-npx prisma db push
-npm run build
-npm start
-```
-
-## Configuration
-
-See [`.env.example`](.env.example) for all available environment variables.
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | SQLite (`file:./data/humantest.db`) or MySQL connection string |
-| `NEXTAUTH_SECRET` | Yes | Random secret for session encryption |
-| `NEXTAUTH_URL` | Yes | App URL (`http://localhost:3000` or `https://your-domain.com`) |
-| `AI_PROVIDER` | No | `anthropic` (default) or `openai` |
-| `AI_API_KEY` | No | API key for AI report generation |
-| `SMTP_HOST` | No | Enable email verification (skip = direct registration) |
-| `SMTP_FROM` | No | Email sender address |
-| `OSS_REGION` | No | Alibaba Cloud OSS region (skip = store recordings on local disk) |
-| `OSS_BUCKET` | No | Alibaba Cloud OSS bucket name |
-| `GITHUB_TOKEN` | No | Enable repo cloning and auto-PR for code fix suggestions |
-
-These can also be configured at runtime through the admin settings page (see below).
-
-## Admin Settings
-
-The first registered user automatically becomes the admin. The admin can configure platform-wide settings from the Settings page (`/settings`):
-
-- **AI provider** — Anthropic, OpenAI, or compatible (custom base URL + model override)
-- **SMTP** — host, port, user, password, sender address (enables email verification for registration)
-- **Object storage** — Alibaba Cloud OSS region, bucket, role name (otherwise recordings are stored on local disk)
-- **GitHub token** — enables repo cloning and auto-PR for code fix suggestions
-- **Default task settings** — default max testers and estimated minutes for new tasks
-- **Default language** — English or Chinese
-
-## CLI Commands
-
-| Command | Description |
-|---------|-------------|
-| `humantest init [--non-interactive]` | Setup wizard (`--non-interactive` for auto mode) |
-| `humantest start` | Start the server (pm2) |
-| `humantest stop` | Stop the server |
-| `humantest restart` | Restart the server |
-| `humantest update` | Pull latest code, rebuild, and restart |
-| `humantest status` | Check server status |
-| `humantest logs` | View server logs |
-| `humantest uninstall` | Stop server and remove all files |
-
-## Architecture
-
-```
-Next.js 16 + Prisma + NextAuth + Tailwind CSS
-
-├── app/                    # Next.js app router pages & API routes
-│   ├── api/
-│   │   ├── skill/          # AI agent skill API (create task, check status)
-│   │   ├── tasks/          # Task CRUD, claim, submit, report generation
-│   │   ├── ai/             # AI test plan generation
-│   │   ├── auth/           # Registration, login, email verification
-│   │   ├── oss/            # Presigned upload URLs (OSS or local)
-│   │   ├── recordings/     # Local recording upload & serve
-│   │   ├── config/         # Public config endpoint
-│   │   └── settings/       # Admin platform settings
-│   ├── tasks/              # Task list, detail, testing flow, feedback form
-│   ├── my-tasks/           # User's claimed & created tasks
-│   ├── settings/           # User API key + admin settings page
-│   └── onboarding/         # Post-registration guided onboarding
-├── lib/
-│   ├── ai-report.ts        # Report generation (two-phase media + text analysis)
-│   ├── media-analysis.ts   # Video frame extraction (ffmpeg) and AI vision analysis
-│   ├── code-fixer.ts       # Repo-aware code fix suggestions + auto-PR
-│   ├── webhook.ts          # Webhook delivery
-│   ├── validate.ts         # Zod schemas for input validation
-│   ├── rate-limit.ts       # Per-endpoint rate limiting
-│   └── i18n/               # English + Chinese translations
-├── prisma/
-│   └── schema.prisma       # Database schema (MySQL or SQLite)
-├── skill/
-│   └── SKILL.md            # AI agent skill definition
-└── cli/
-    └── humantest.mjs       # CLI tool source
-```
+Or skip setup entirely — use the hosted version at **[human-test.work](https://human-test.work)**.
 
 ## AI Agent Integration
 
-human_test() is designed as an AI agent skill. Your AI coding agent can call it to get real human feedback on your product:
+human_test() is designed as an **AI agent primitive** — not a dashboard for humans to interpret, but a structured API that agents can call, parse, and act on directly.
+
+### Install as a skill
 
 ```bash
-# Install as an agent skill (Claude Code, Cursor, Copilot, etc.)
+# Works with Claude Code, Cursor, Windsurf, etc.
 npx skills add avivahe326/human-test-skill
 ```
 
-Or call the API directly (no authentication required for self-hosted instances):
+Once installed, your agent can call `human_test()` in natural language:
+
+> "Run a usability test on my checkout flow with 3 testers"
+
+### Or call the API directly
 
 ```bash
 curl -X POST http://localhost:3000/api/skill/human-test \
@@ -176,53 +55,231 @@ curl -X POST http://localhost:3000/api/skill/human-test \
   -d '{
     "url": "https://your-product.com",
     "focus": "Test the onboarding flow",
-    "maxTesters": 5,
-    "repoUrl": "https://github.com/you/repo",
+    "maxTesters": 5
+  }'
+```
+
+No authentication required for self-hosted instances.
+
+## How It Works
+
+1. **Create a task** — provide a URL (or description for mobile/desktop apps) and what to focus on
+2. **Real humans test** — testers claim the task, record their screen + microphone, complete a guided feedback flow (first impression, task steps, NPS rating)
+3. **AI generates a report** — extracts key frames from recordings, uses vision AI to analyze usability issues, aggregates all feedback into a structured, severity-ranked report
+4. **Auto-fix (optional)** — if you provide a `repoUrl`, the platform clones your code, generates file-level fix suggestions, and creates a PR
+
+<!-- TODO: Add a workflow diagram or screenshot here -->
+<!-- ![Workflow](docs/images/workflow.png) -->
+
+## Auto-Fix: From Report to PR
+
+This is the closed-loop that makes human_test() different from traditional UX testing tools:
+
+```
+human_test() → real humans test → structured report
+    → AI reads report issues → clones your repo
+    → generates file-level diffs → creates a PR
+```
+
+Pass a `repoUrl` when creating a task:
+
+```bash
+curl -X POST http://localhost:3000/api/skill/human-test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-product.com",
+    "focus": "Test the checkout flow",
+    "repoUrl": "https://github.com/your-org/your-repo",
     "webhookUrl": "https://your-server.com/webhook",
     "codeFixWebhookUrl": "https://your-server.com/code-fix-webhook"
   }'
 ```
 
+**Two modes** (auto-detected based on GitHub permissions):
+- **Read-only access** — get code fix suggestions as diffs in the report
+- **Write access** — get an auto-created PR with the fixes applied
+
+<!-- TODO: Add screenshot of an auto-generated PR here -->
+<!-- ![Auto PR](docs/images/auto-pr-screenshot.png) -->
+
+## Why Not UserTesting / Maze / etc.?
+
+Traditional UX testing platforms are built for human product managers reviewing dashboards. human_test() is built for **AI agents writing code**:
+
+- **Structured output** — severity-ranked issues with Evidence/Impact/Recommendation, designed for agents to parse and act on
+- **Webhook-driven** — async notifications when reports and code fixes are ready
+- **Auto-PR** — from usability issue to pull request, no human in the middle
+- **Self-hostable** — runs locally with SQLite, your data stays on your machine
+- **Open source** — MIT licensed, extend it however you want
+
 ## Report Format
 
-Reports are structured for AI agents to parse and act on:
+Reports are structured markdown designed for AI agents to parse directly:
 
 ```markdown
+## Metadata
+| Field | Value |
+|-------|-------|
+| Product | Your App |
+| Testers | 5 |
+| Avg NPS | 7.2/10 |
+
+## Executive Summary
+(3-5 sentences, most critical finding first)
+
 ## Issues
-### [CRITICAL] Issue title
-- **Evidence:** what was observed and by whom
-- **Impact:** how it affects users
-- **Recommendation:** specific fix
+### [CRITICAL] Signup button unresponsive on mobile
+- **Evidence:** 3/5 testers couldn't complete registration on iPhone
+- **Impact:** 60% of mobile users will abandon signup
+- **Recommendation:** Fix touch target size, minimum 44x44px
+
+### [MAJOR] Confusing pricing page layout
+...
 
 ## Recommendations
-- **P0** (fix immediately): ...
-- **P1** (fix this sprint): ...
+- **P0** (fix immediately): Mobile signup button
+- **P1** (fix this sprint): Pricing page clarity
+- **P2** (next sprint): ...
 ```
 
-## Code Fix Suggestions
+Severity levels: `[CRITICAL]`, `[MAJOR]`, `[MINOR]`. Priority tags: `P0`–`P3`. Each issue has three fields: Evidence, Impact, Recommendation — giving your agent enough context to write a targeted fix.
 
-Pass a `repoUrl` when creating a task to get code-level fix suggestions:
+## Parameters
 
-- **Mode 1 (Read-only)**: Grant the platform's GitHub account read access → get file-level fix suggestions in the report
-- **Mode 2 (Write access)**: Grant write access → get an auto-created PR with the fixes
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `url` | No | — | Product URL (leave empty for mobile apps or non-web products) |
+| `focus` | No | — | What testers should focus on |
+| `maxTesters` | No | 5 | Number of testers (1–50) |
+| `repoUrl` | No | — | GitHub repo URL for auto-fix and PR creation |
+| `repoBranch` | No | default | Branch to analyze |
+| `webhookUrl` | No | — | URL to receive the report when ready |
+| `codeFixWebhookUrl` | No | — | URL to receive code fix results |
+| `creator` | No | admin | Agent/user name creating the task |
+| `locale` | No | `en` | Report language: `en` or `zh` |
 
-Code fix generation is triggered automatically when a report completes (if `repoUrl` is set), or manually from the task detail page.
+## CLI Commands
 
-## Rate Limiting
+| Command | Description |
+|---------|-------------|
+| `humantest init` | Setup wizard (add `--non-interactive` for auto mode) |
+| `humantest start` | Start the server |
+| `humantest stop` | Stop the server |
+| `humantest restart` | Restart the server |
+| `humantest update` | Pull latest, rebuild, restart |
+| `humantest status` | Check server status |
+| `humantest logs` | View server logs |
 
-API endpoints are rate-limited per user/IP:
+<details>
+<summary><strong>Configuration</strong></summary>
+
+See [`.env.example`](.env.example) for all available variables.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | SQLite (`file:./data/humantest.db`) or MySQL connection string |
+| `NEXTAUTH_SECRET` | Yes | Random secret for session encryption |
+| `NEXTAUTH_URL` | Yes | App URL (`http://localhost:3000` or your domain) |
+| `AI_PROVIDER` | No | `anthropic` (default) or `openai` |
+| `AI_API_KEY` | No | API key for AI report generation |
+| `SMTP_HOST` | No | Enable email verification (skip = direct registration) |
+| `OSS_REGION` | No | Object storage region (skip = store recordings on local disk) |
+| `GITHUB_TOKEN` | No | Enable repo cloning and auto-PR |
+
+The first registered user becomes admin and can change all settings from the web UI at `/settings`.
+
+### Non-interactive setup
+
+For automated/CI installs:
+
+```bash
+humantest init --non-interactive
+```
+
+Uses local mode (SQLite), auto-detects AI keys from environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `GEMINI_API_KEY`), port 3000. Creates a default admin user (`admin@humantest.local` / `admin`).
+
+</details>
+
+<details>
+<summary><strong>Webhooks</strong></summary>
+
+Two separate webhooks for the two stages:
+
+### Report webhook (`webhookUrl`)
+
+```json
+{
+  "event": "report",
+  "taskId": "...",
+  "status": "COMPLETED",
+  "report": "## Executive Summary\n..."
+}
+```
+
+### Code fix webhook (`codeFixWebhookUrl`)
+
+```json
+{
+  "event": "code_fix",
+  "taskId": "...",
+  "status": "COMPLETED",
+  "codeFixPrUrl": "https://github.com/user/repo/pull/1"
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Architecture</strong></summary>
+
+```
+Next.js 16 + Prisma + NextAuth + Tailwind CSS
+
+├── app/                    # App router pages & API routes
+│   ├── api/
+│   │   ├── skill/          # AI agent skill API
+│   │   ├── tasks/          # Task CRUD, claim, submit, report generation
+│   │   ├── auth/           # Registration, login, email verification
+│   │   └── settings/       # Admin platform settings
+│   ├── tasks/              # Task list, detail, testing flow
+│   └── settings/           # Admin settings page
+├── lib/
+│   ├── ai-report.ts        # Two-phase media + text analysis
+│   ├── media-analysis.ts   # Video frame extraction + AI vision
+│   ├── code-fixer.ts       # Repo-aware code fix + auto-PR
+│   └── i18n/               # English + Chinese
+├── prisma/schema.prisma    # Database schema (MySQL or SQLite)
+├── skill/SKILL.md          # AI agent skill definition
+└── cli/humantest.mjs       # CLI tool source
+```
+
+</details>
+
+<details>
+<summary><strong>Rate Limiting</strong></summary>
 
 | Endpoint | Limit |
 |----------|-------|
-| Registration | 5 req/min per IP |
-| Email verification code | 3 req/min per IP, 1 req/min per email |
-| Task creation | 10 req/min per user |
-| Skill API | 30 req/min per user |
-| Recording presign | 10 req/min per user |
+| Registration | 5/min per IP |
+| Email verification | 3/min per IP |
+| Task creation | 10/min per user |
+| Skill API | 30/min per user |
 
-## Cloud Service
+</details>
 
-Don't want to self-host? Use the hosted version at **[human-test.work](https://human-test.work)** — same platform, zero setup.
+## Manual Setup
+
+If you prefer not to use the CLI:
+
+```bash
+git clone https://github.com/avivahe326/humantest.git
+cd humantest
+cp .env.example .env    # edit with your settings
+npm install
+npx prisma db push
+npm run build
+npm start
+```
 
 ## License
 
