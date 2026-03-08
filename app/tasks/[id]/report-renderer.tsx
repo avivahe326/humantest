@@ -235,8 +235,8 @@ interface ParsedCodeFix {
   severity: string
   title: string
   file: string
-  lines: string
-  diff: string
+  search: string
+  replace: string
   explanation: string
 }
 
@@ -255,48 +255,51 @@ function parseCodeFixes(content: string): ParsedCodeFix[] {
     const body = lines.slice(1).join('\n')
 
     const fileMatch = body.match(/\*\*File:\*\*\s*`?([^`\n]+)`?/)
-    const linesMatch = body.match(/\*\*Lines?:\*\*\s*(.+)/)
     const explMatch = body.match(/\*\*Explanation:\*\*\s*([\s\S]+?)(?=\n### |\n\*\*File:|\s*$)/)
 
-    // Extract diff block
-    const diffMatch = body.match(/```diff\n([\s\S]*?)```/)
+    // Extract search/replace blocks
+    const srMatch = body.match(/<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/)
+
+    // Also support legacy diff format
+    const diffMatch = !srMatch ? body.match(/```diff\n([\s\S]*?)```/) : null
 
     fixes.push({
       severity,
       title,
       file: fileMatch?.[1]?.trim() || '',
-      lines: linesMatch?.[1]?.trim() || '',
-      diff: diffMatch?.[1]?.trim() || '',
+      search: srMatch?.[1] || '',
+      replace: srMatch?.[2] || '',
       explanation: explMatch?.[1]?.trim() || '',
     })
+
+    // If only a diff was found, convert to pseudo search/replace for display
+    if (!srMatch && diffMatch) {
+      const lastFix = fixes[fixes.length - 1]
+      const diffLines = diffMatch[1].split('\n')
+      lastFix.search = diffLines.filter(l => (l.startsWith('-') && !l.startsWith('---'))).map(l => l.slice(1)).join('\n')
+      lastFix.replace = diffLines.filter(l => (l.startsWith('+') && !l.startsWith('+++'))).map(l => l.slice(1)).join('\n')
+    }
   }
 
   return fixes
 }
 
-function DiffBlock({ diff }: { diff: string }) {
-  const lines = diff.split('\n')
+function SearchReplaceBlock({ search, replace }: { search: string; replace: string }) {
+  const searchLines = search.split('\n')
+  const replaceLines = replace.split('\n')
   return (
     <div className="rounded-md border border-border overflow-hidden text-xs font-mono">
-      {lines.map((line, i) => {
-        let bg = ''
-        let textColor = 'text-muted-foreground'
-        if (line.startsWith('+') && !line.startsWith('+++')) {
-          bg = 'bg-green-500/10'
-          textColor = 'text-green-400'
-        } else if (line.startsWith('-') && !line.startsWith('---')) {
-          bg = 'bg-red-500/10'
-          textColor = 'text-red-400'
-        } else if (line.startsWith('@@')) {
-          bg = 'bg-blue-500/10'
-          textColor = 'text-blue-400'
-        }
-        return (
-          <div key={i} className={`px-3 py-0.5 ${bg} ${textColor} whitespace-pre-wrap break-all`}>
-            {line || ' '}
-          </div>
-        )
-      })}
+      {searchLines.map((line, i) => (
+        <div key={`s-${i}`} className="px-3 py-0.5 bg-red-500/10 text-red-400 whitespace-pre-wrap break-all">
+          <span className="select-none text-red-400/50 mr-2">-</span>{line || ' '}
+        </div>
+      ))}
+      <div className="border-t border-border/50" />
+      {replaceLines.map((line, i) => (
+        <div key={`r-${i}`} className="px-3 py-0.5 bg-green-500/10 text-green-400 whitespace-pre-wrap break-all">
+          <span className="select-none text-green-400/50 mr-2">+</span>{line || ' '}
+        </div>
+      ))}
     </div>
   )
 }
@@ -308,17 +311,12 @@ function CodeFixCard({ fix }: { fix: ParsedCodeFix }) {
         <SeverityBadge severity={fix.severity} />
         <h4 className="text-sm font-semibold leading-snug">{fix.title}</h4>
       </div>
-      {(fix.file || fix.lines) && (
+      {fix.file && (
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {fix.file && (
-            <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{fix.file}</span>
-          )}
-          {fix.lines && (
-            <span>Lines {fix.lines}</span>
-          )}
+          <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{fix.file}</span>
         </div>
       )}
-      {fix.diff && <DiffBlock diff={fix.diff} />}
+      {(fix.search || fix.replace) && <SearchReplaceBlock search={fix.search} replace={fix.replace} />}
       {fix.explanation && (
         <div className="text-xs text-muted-foreground leading-relaxed">
           <span className="font-semibold text-primary">Explanation: </span>

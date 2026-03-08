@@ -207,27 +207,27 @@ Generate code fix suggestions for the issues above. Focus on CRITICAL and MAJOR 
     {
       system: `You are an expert code reviewer. Given usability issues found by real human testers and the relevant source code files, generate specific code-level fix suggestions.
 
-For each issue that can be addressed in code, produce a unified diff. If an issue requires design/copy changes rather than code changes, describe the change in prose instead.
+For each issue that can be addressed in code, provide a search/replace block showing the exact code to find and replace. Copy the original code EXACTLY as it appears in the source file — every character, space, and indent must match.
 
 Output format — for each fixable issue:
 
 ### [SEVERITY] Issue title
 **File:** \`path/to/file.ext\`
-**Lines:** ~N-M
 
-\`\`\`diff
---- a/path/to/file.ext
-+++ b/path/to/file.ext
-@@ -N,X +N,Y @@
- context line
--old line
-+new line
- context line
-\`\`\`
+<<<<<<< SEARCH
+exact original code to find (copy verbatim from source)
+=======
+replacement code
+>>>>>>> REPLACE
 
 **Explanation:** Brief description of why this fix addresses the issue.
 
-If an issue cannot be fixed in code (e.g., requires new assets, infrastructure changes, or policy decisions), say so briefly and skip it.` + await getLanguageInstruction(locale),
+Rules:
+- The SEARCH block must be an exact, verbatim copy from the source file — do NOT paraphrase, reformat, or change whitespace
+- Keep SEARCH blocks as small as possible — just enough lines to uniquely identify the location
+- Each search/replace block should address one specific change
+- You may include multiple search/replace blocks for the same file
+- If an issue cannot be fixed in code (e.g., requires new assets, infrastructure changes, or policy decisions), say so briefly and skip it.` + await getLanguageInstruction(locale),
       maxTokens: 8192,
       temperature: 0.3,
       timeoutMs: 300000,
@@ -235,6 +235,93 @@ If an issue cannot be fixed in code (e.g., requires new assets, infrastructure c
   )
 
   return response.text || 'No code suggestions generated.'
+}
+
+interface SearchReplaceBlock {
+  file: string
+  search: string
+  replace: string
+}
+
+function extractSearchReplaceBlocks(suggestions: string): SearchReplaceBlock[] {
+  const blocks: SearchReplaceBlock[] = []
+
+  // Find all **File:** markers and their associated search/replace blocks
+  const parts = suggestions.split(/^### /m)
+
+  for (const part of parts) {
+    const fileMatch = part.match(/\*\*File:\*\*\s*`?([^`\n]+)`?/)
+    if (!fileMatch) continue
+    const file = fileMatch[1].trim()
+
+    // Find all search/replace blocks in this section
+    const srRegex = /<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
+    let srMatch: RegExpExecArray | null
+
+    while ((srMatch = srRegex.exec(part)) !== null) {
+      const search = srMatch[1]
+      const replace = srMatch[2]
+      if (search.trim()) {
+        blocks.push({ file, search, replace })
+      }
+    }
+  }
+
+  return blocks
+}
+
+async function applySearchReplace(repoDir: string, block: SearchReplaceBlock): Promise<void> {
+  const { readFile: readFileAsync, writeFile: writeFileAsync } = await import('fs/promises')
+  const filePath = join(repoDir, block.file)
+
+  let original: string
+  try {
+    original = await readFileAsync(filePath, 'utf-8')
+  } catch {
+    throw new Error(`Cannot read file: ${block.file}`)
+  }
+
+  // Strategy 1: exact match
+  if (original.includes(block.search)) {
+    const modified = original.replace(block.search, block.replace)
+    if (modified === original) throw new Error('No changes after replacement')
+    await writeFileAsync(filePath, modified)
+    return
+  }
+
+  // Strategy 2: trimmed-line matching (handles whitespace differences)
+  const originalLines = original.split('\n')
+  const searchLines = block.search.split('\n')
+  const searchTrimmed = searchLines.map(l => l.trim())
+
+  for (let i = 0; i <= originalLines.length - searchLines.length; i++) {
+    const candidateTrimmed = originalLines.slice(i, i + searchLines.length).map(l => l.trim())
+    if (candidateTrimmed.every((line, j) => line === searchTrimmed[j])) {
+      // Detect the indentation of the first matched line
+      const existingIndent = originalLines[i].match(/^(\s*)/)?.[1] || ''
+      const searchIndent = searchLines[0].match(/^(\s*)/)?.[1] || ''
+      const replaceLines = block.replace.split('\n').map(l => {
+        const lineIndent = l.match(/^(\s*)/)?.[1] || ''
+        // If the replace line has the same base indent as search, swap to existing
+        if (lineIndent.startsWith(searchIndent)) {
+          return existingIndent + l.slice(searchIndent.length)
+        }
+        return l
+      })
+
+      const newLines = [
+        ...originalLines.slice(0, i),
+        ...replaceLines,
+        ...originalLines.slice(i + searchLines.length),
+      ]
+      const modified = newLines.join('\n')
+      if (modified === original) throw new Error('No changes after replacement')
+      await writeFileAsync(filePath, modified)
+      return
+    }
+  }
+
+  throw new Error(`Could not find matching code block in ${block.file}`)
 }
 
 async function tryCreatePR(
@@ -252,7 +339,6 @@ async function tryCreatePR(
       'push', '--dry-run', 'origin', 'HEAD',
     ], { cwd: repoDir, timeout: 15000 })
   } catch (err) {
-    // No write access — Mode 1
     console.log(`[CodeFix ${taskId}] No write access (dry-run push failed):`, (err as Error).message)
     return null
   }
@@ -263,25 +349,28 @@ async function tryCreatePR(
     // Create branch
     await execFileAsync('git', ['checkout', '-b', branchName], { cwd: repoDir })
 
-    // Extract diffs from suggestions and try to apply them
-    const diffBlocks = extractDiffsFromSuggestions(suggestions)
-    console.log(`[CodeFix ${taskId}] Extracted ${diffBlocks.length} diff blocks`)
-    if (diffBlocks.length === 0) return null
+    // Extract search/replace blocks from suggestions
+    const srBlocks = extractSearchReplaceBlocks(suggestions)
+    console.log(`[CodeFix ${taskId}] Extracted ${srBlocks.length} search/replace blocks`)
+    if (srBlocks.length === 0) return null
 
-    let appliedAny = false
-    for (const diff of diffBlocks) {
+    let appliedCount = 0
+    for (const block of srBlocks) {
       try {
-        await applyDiff(repoDir, diff)
-        appliedAny = true
+        await applySearchReplace(repoDir, block)
+        appliedCount++
+        console.log(`[CodeFix ${taskId}] Applied fix to ${block.file}`)
       } catch (err) {
-        console.warn(`[CodeFix ${taskId}] Failed to apply diff for ${diff.file}:`, err)
+        console.warn(`[CodeFix ${taskId}] Failed to apply fix for ${block.file}:`, (err as Error).message)
       }
     }
 
-    if (!appliedAny) {
-      console.log(`[CodeFix ${taskId}] No diffs could be applied, skipping PR`)
+    if (appliedCount === 0) {
+      console.log(`[CodeFix ${taskId}] No fixes could be applied, skipping PR`)
       return null
     }
+
+    console.log(`[CodeFix ${taskId}] Applied ${appliedCount}/${srBlocks.length} fixes`)
 
     const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
 
@@ -300,124 +389,6 @@ async function tryCreatePR(
     console.error(`[CodeFix ${taskId}] Failed to create PR:`, err)
     return null
   }
-}
-
-interface DiffBlock {
-  file: string
-  diff: string
-}
-
-function extractDiffsFromSuggestions(suggestions: string): DiffBlock[] {
-  const blocks: DiffBlock[] = []
-  const diffRegex = /```diff\n([\s\S]*?)```/g
-  let match: RegExpExecArray | null
-
-  while ((match = diffRegex.exec(suggestions)) !== null) {
-    const diffContent = match[1].trim()
-    // Extract file from --- a/ line
-    const fileMatch = diffContent.match(/^---\s*a\/(.+)/m)
-    if (fileMatch) {
-      blocks.push({ file: fileMatch[1].trim(), diff: diffContent })
-    }
-  }
-
-  return blocks
-}
-
-async function applyDiff(repoDir: string, diff: DiffBlock): Promise<void> {
-  const { writeFile: writeFileAsync } = await import('fs/promises')
-  const patchPath = join(repoDir, '.human-test-patch.diff')
-
-  // Normalize the diff: ensure it ends with newline, fix common LLM issues
-  let normalized = diff.diff.replace(/\r\n/g, '\n')
-  // Ensure trailing newline
-  if (!normalized.endsWith('\n')) normalized += '\n'
-
-  try {
-    await writeFileAsync(patchPath, normalized)
-
-    // Try strict apply first
-    try {
-      await execFileAsync('git', ['apply', '--check', '.human-test-patch.diff'], { cwd: repoDir })
-      await execFileAsync('git', ['apply', '.human-test-patch.diff'], { cwd: repoDir })
-      return
-    } catch { /* strict failed, try lenient */ }
-
-    // Try with whitespace ignore + fuzz
-    try {
-      await execFileAsync('git', ['apply', '--check', '--ignore-whitespace', '-C1', '.human-test-patch.diff'], { cwd: repoDir })
-      await execFileAsync('git', ['apply', '--ignore-whitespace', '-C1', '.human-test-patch.diff'], { cwd: repoDir })
-      return
-    } catch { /* lenient also failed, try manual apply */ }
-
-    // Last resort: try to apply the changes manually by parsing the diff
-    await manualApplyDiff(repoDir, diff)
-  } finally {
-    try { await rm(patchPath) } catch {}
-  }
-}
-
-async function manualApplyDiff(repoDir: string, diff: DiffBlock): Promise<void> {
-  const { readFile: readFileAsync, writeFile: writeFileAsync } = await import('fs/promises')
-  const filePath = join(repoDir, diff.file)
-
-  let original: string
-  try {
-    original = await readFileAsync(filePath, 'utf-8')
-  } catch {
-    throw new Error(`Cannot read file: ${diff.file}`)
-  }
-
-  const lines = diff.diff.split('\n')
-  const removals: string[] = []
-  const additions: string[] = []
-
-  for (const line of lines) {
-    if (line.startsWith('-') && !line.startsWith('---')) {
-      removals.push(line.slice(1))
-    } else if (line.startsWith('+') && !line.startsWith('+++')) {
-      additions.push(line.slice(1))
-    }
-  }
-
-  if (removals.length === 0 && additions.length === 0) {
-    throw new Error('No changes found in diff')
-  }
-
-  // Try to find and replace the removed lines with added lines
-  let modified = original
-  // Build a search string from removals (trimmed to handle whitespace differences)
-  const searchBlock = removals.map(l => l.trim()).join('\n')
-  const replaceBlock = additions.join('\n')
-
-  // Find the block in the original by comparing trimmed lines
-  const originalLines = original.split('\n')
-  let matchStart = -1
-
-  for (let i = 0; i <= originalLines.length - removals.length; i++) {
-    const candidate = originalLines.slice(i, i + removals.length).map(l => l.trim()).join('\n')
-    if (candidate === searchBlock) {
-      matchStart = i
-      break
-    }
-  }
-
-  if (matchStart === -1) {
-    throw new Error(`Could not find matching code block in ${diff.file}`)
-  }
-
-  const newLines = [
-    ...originalLines.slice(0, matchStart),
-    ...additions,
-    ...originalLines.slice(matchStart + removals.length),
-  ]
-  modified = newLines.join('\n')
-
-  if (modified === original) {
-    throw new Error('No changes after applying diff')
-  }
-
-  await writeFileAsync(filePath, modified)
 }
 
 async function createPullRequest(
