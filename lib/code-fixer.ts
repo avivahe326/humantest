@@ -328,13 +328,96 @@ async function applyDiff(repoDir: string, diff: DiffBlock): Promise<void> {
   const { writeFile: writeFileAsync } = await import('fs/promises')
   const patchPath = join(repoDir, '.human-test-patch.diff')
 
+  // Normalize the diff: ensure it ends with newline, fix common LLM issues
+  let normalized = diff.diff.replace(/\r\n/g, '\n')
+  // Ensure trailing newline
+  if (!normalized.endsWith('\n')) normalized += '\n'
+
   try {
-    await writeFileAsync(patchPath, diff.diff + '\n')
-    await execFileAsync('git', ['apply', '--check', '.human-test-patch.diff'], { cwd: repoDir })
-    await execFileAsync('git', ['apply', '.human-test-patch.diff'], { cwd: repoDir })
+    await writeFileAsync(patchPath, normalized)
+
+    // Try strict apply first
+    try {
+      await execFileAsync('git', ['apply', '--check', '.human-test-patch.diff'], { cwd: repoDir })
+      await execFileAsync('git', ['apply', '.human-test-patch.diff'], { cwd: repoDir })
+      return
+    } catch { /* strict failed, try lenient */ }
+
+    // Try with whitespace ignore + fuzz
+    try {
+      await execFileAsync('git', ['apply', '--check', '--ignore-whitespace', '-C1', '.human-test-patch.diff'], { cwd: repoDir })
+      await execFileAsync('git', ['apply', '--ignore-whitespace', '-C1', '.human-test-patch.diff'], { cwd: repoDir })
+      return
+    } catch { /* lenient also failed, try manual apply */ }
+
+    // Last resort: try to apply the changes manually by parsing the diff
+    await manualApplyDiff(repoDir, diff)
   } finally {
     try { await rm(patchPath) } catch {}
   }
+}
+
+async function manualApplyDiff(repoDir: string, diff: DiffBlock): Promise<void> {
+  const { readFile: readFileAsync, writeFile: writeFileAsync } = await import('fs/promises')
+  const filePath = join(repoDir, diff.file)
+
+  let original: string
+  try {
+    original = await readFileAsync(filePath, 'utf-8')
+  } catch {
+    throw new Error(`Cannot read file: ${diff.file}`)
+  }
+
+  const lines = diff.diff.split('\n')
+  const removals: string[] = []
+  const additions: string[] = []
+
+  for (const line of lines) {
+    if (line.startsWith('-') && !line.startsWith('---')) {
+      removals.push(line.slice(1))
+    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+      additions.push(line.slice(1))
+    }
+  }
+
+  if (removals.length === 0 && additions.length === 0) {
+    throw new Error('No changes found in diff')
+  }
+
+  // Try to find and replace the removed lines with added lines
+  let modified = original
+  // Build a search string from removals (trimmed to handle whitespace differences)
+  const searchBlock = removals.map(l => l.trim()).join('\n')
+  const replaceBlock = additions.join('\n')
+
+  // Find the block in the original by comparing trimmed lines
+  const originalLines = original.split('\n')
+  let matchStart = -1
+
+  for (let i = 0; i <= originalLines.length - removals.length; i++) {
+    const candidate = originalLines.slice(i, i + removals.length).map(l => l.trim()).join('\n')
+    if (candidate === searchBlock) {
+      matchStart = i
+      break
+    }
+  }
+
+  if (matchStart === -1) {
+    throw new Error(`Could not find matching code block in ${diff.file}`)
+  }
+
+  const newLines = [
+    ...originalLines.slice(0, matchStart),
+    ...additions,
+    ...originalLines.slice(matchStart + removals.length),
+  ]
+  modified = newLines.join('\n')
+
+  if (modified === original) {
+    throw new Error('No changes after applying diff')
+  }
+
+  await writeFileAsync(filePath, modified)
 }
 
 async function createPullRequest(
