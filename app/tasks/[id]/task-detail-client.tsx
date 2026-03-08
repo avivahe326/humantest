@@ -666,9 +666,9 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
               {!isCodeFixing && codeFixStatus !== 'FAILED' && !parsedReport?.codeFixSuggestions && (
                 <div className="text-center py-8 space-y-3">
                   <p className="text-sm text-muted-foreground">{t('taskDetail.noCodeFix')}</p>
-                  {isCreator && hasGithubToken && !codeFixStatus && (
+                  {isCreator && hasGithubToken && (
                     <Button onClick={handleGenerateCodeFix} disabled={generatingCodeFix} variant="secondary">
-                      {generatingCodeFix ? t('taskDetail.starting') : t('taskDetail.generateCodeFixBtn')}
+                      {generatingCodeFix ? t('taskDetail.starting') : codeFixStatus ? t('taskDetail.regenerateCodeFix') : t('taskDetail.generateCodeFixBtn')}
                     </Button>
                   )}
                 </div>

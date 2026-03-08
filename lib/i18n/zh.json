@@ -180,7 +180,7 @@
     "generatingCodeFix": "正在生成代码修复...",
     "codeFixTab": "代码修复",
     "pullRequestTab": "Pull Request",
-    "noCodeFix": "暂无代码修复建议。",
+    "noCodeFix": "未生成代码修复建议。可能是报告格式无法解析出问题项，请尝试重新生成。",
     "noPr": "暂未创建 Pull Request。",
     "regenerateCodeFix": "重新生成",
     "codeFixProgress": "正在分析代码并生成修复建议...",

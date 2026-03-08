@@ -180,7 +180,7 @@
     "generatingCodeFix": "Generating code fix...",
     "codeFixTab": "Code Fix",
     "pullRequestTab": "Pull Request",
-    "noCodeFix": "No code fix suggestions yet.",
+    "noCodeFix": "No code fix suggestions generated. This may happen if the report format couldn't be parsed for issues. Try regenerating.",
     "noPr": "No pull request created.",
     "regenerateCodeFix": "Regenerate",
     "codeFixProgress": "Analyzing code and generating fixes...",
