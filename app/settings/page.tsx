@@ -79,7 +79,6 @@ export default function SettingsPage() {
             <p className="mb-2 text-xs text-muted-foreground">{t('settings.exampleUsage')}</p>
             <code className="text-xs break-all">
               curl -X POST {typeof window !== 'undefined' ? window.location.origin : ''}/api/skill/human-test \<br />
-              &nbsp;&nbsp;-H &quot;Authorization: Bearer {showKey ? apiKey : '<your-api-key>'}&quot; \<br />
               &nbsp;&nbsp;-H &quot;Content-Type: application/json&quot; \<br />
               &nbsp;&nbsp;-d &apos;{'{'}&quot;url&quot;:&quot;https://your-product.com&quot;{'}'}&apos;
             </code>
