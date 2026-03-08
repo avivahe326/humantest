@@ -21,7 +21,7 @@ interface ReportIssue {
 
 function parseReportIssues(report: string): ReportIssue[] {
   const issues: ReportIssue[] = []
-  const issueRegex = /###\s*\[(CRITICAL|MAJOR|MINOR)\]\s*(.+)/g
+  const issueRegex = /###\s*\[?(CRITICAL|MAJOR|MINOR)\]?\s+(.+)/g
   let match: RegExpExecArray | null
 
   while ((match = issueRegex.exec(report)) !== null) {
