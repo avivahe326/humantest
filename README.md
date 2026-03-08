@@ -20,8 +20,7 @@ Agent: → calls human_test()
        → 3 critical issues found, auto-generates fixes, creates PR #42
 ```
 
-<!-- TODO: Add screenshot of a real report or dashboard here -->
-<!-- ![Report Screenshot](docs/images/report-screenshot.png) -->
+![Sample Report](docs/images/report-screenshot.png)
 
 ## Quick Start
 
@@ -72,8 +71,7 @@ No authentication required for self-hosted instances.
 3. **AI generates a report** — extracts key frames from recordings, uses vision AI to analyze usability issues, aggregates all feedback into a structured, severity-ranked report
 4. **Auto-fix (optional)** — if you provide a `repoUrl`, the platform clones your code, generates file-level fix suggestions, and creates a PR
 
-<!-- TODO: Add a workflow diagram or screenshot here -->
-<!-- ![Workflow](docs/images/workflow.png) -->
+![Task Dashboard](docs/images/workflow.png)
 
 ## Auto-Fix: From Report to PR
 
@@ -103,8 +101,7 @@ curl -X POST http://localhost:3000/api/skill/human-test \
 - **Read-only access** — get code fix suggestions as diffs in the report
 - **Write access** — get an auto-created PR with the fixes applied
 
-<!-- TODO: Add screenshot of an auto-generated PR here -->
-<!-- ![Auto PR](docs/images/auto-pr-screenshot.png) -->
+![Code Fix Suggestions](docs/images/auto-pr-screenshot.png)
 
 ## Why Not UserTesting / Maze / etc.?
 
