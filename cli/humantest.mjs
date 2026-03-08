@@ -104,35 +104,38 @@ function getPort(appDir) {
 
 function createAdminUser(appDir) {
   console.log('\n  Creating default admin user...')
+  const scriptPath = join(appDir, '.humantest-create-admin.cjs')
   const script = `
-    const { PrismaClient } = require('@prisma/client');
-    const bcrypt = require('bcryptjs');
-    const crypto = require('crypto');
-    async function main() {
-      const prisma = new PrismaClient();
-      try {
-        const existing = await prisma.user.findUnique({ where: { email: 'admin@humantest.local' } });
-        if (existing) {
-          console.log('  Admin user already exists, skipping.');
-          return;
-        }
-        const hash = await bcrypt.hash('admin', 10);
-        await prisma.user.create({
-          data: {
-            name: 'admin',
-            email: 'admin@humantest.local',
-            password: hash,
-            apiKey: crypto.randomBytes(32).toString('hex'),
-          },
-        });
-        console.log('  Admin user created (admin@humantest.local / admin)');
-      } finally {
-        await prisma.$disconnect();
-      }
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+async function main() {
+  const prisma = new PrismaClient();
+  try {
+    const existing = await prisma.user.findUnique({ where: { email: 'admin@humantest.local' } });
+    if (existing) {
+      console.log('  Admin user already exists, skipping.');
+      return;
     }
-    main().catch(e => { console.error('  Warning: could not create admin user:', e.message); });
-  `
-  run(`node -e ${JSON.stringify(script)}`, { cwd: appDir, ignoreError: true })
+    const hash = await bcrypt.hash('admin', 10);
+    await prisma.user.create({
+      data: {
+        name: 'admin',
+        email: 'admin@humantest.local',
+        password: hash,
+        apiKey: crypto.randomBytes(32).toString('hex'),
+      },
+    });
+    console.log('  Admin user created (admin@humantest.local / admin)');
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+main().catch(e => { console.error('  Warning: could not create admin user:', e.message); });
+`
+  writeFileSync(scriptPath, script)
+  run(`node "${scriptPath}"`, { cwd: appDir, ignoreError: true })
+  try { run(`rm -f "${scriptPath}"`, { ignoreError: true }) } catch {}
 }
 
 // Auto-detect AI provider from environment variables
