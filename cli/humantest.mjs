@@ -159,7 +159,7 @@ async function main() {
       'DEFAULT_MAX_TESTERS', 'DEFAULT_ESTIMATED_MINUTES',
     ];
     for (const key of settingKeys) {
-      const match = envContent.match(new RegExp('^' + key + '=["\\'']?(.*?)["\\'']?$', 'm'));
+      const match = envContent.match(new RegExp('^' + key + '="([^"]*)"', 'm'));
       if (match && match[1]) {
         await prisma.setting.upsert({
           where: { key },
