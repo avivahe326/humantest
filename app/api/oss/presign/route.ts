@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid or unauthorized claim' }, { status: 403 })
   }
 
-  if (isLocalStorage()) {
+  if (await isLocalStorage()) {
     const objectKey = generateObjectKey(taskId, claimId, type)
     const token = generateLocalUploadToken(objectKey)
     const uploadUrl = `/api/recordings/upload?key=${encodeURIComponent(objectKey)}&token=${encodeURIComponent(token)}`

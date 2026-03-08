@@ -138,6 +138,48 @@ main().catch(e => { console.error('  Warning: could not create admin user:', e.m
   try { run(`rm -f "${scriptPath}"`, { ignoreError: true }) } catch {}
 }
 
+function seedSettings(appDir) {
+  console.log('\n  Seeding settings from .env...')
+  const scriptPath = join(appDir, '.humantest-seed-settings.cjs')
+  const script = `
+const { PrismaClient } = require('@prisma/client');
+const fs = require('fs');
+const path = require('path');
+async function main() {
+  const prisma = new PrismaClient();
+  try {
+    const envPath = path.join(__dirname, '.env');
+    if (!fs.existsSync(envPath)) return;
+    const envContent = fs.readFileSync(envPath, 'utf-8');
+    const settingKeys = [
+      'AI_PROVIDER', 'AI_API_KEY', 'AI_BASE_URL', 'AI_MODEL',
+      'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM',
+      'OSS_REGION', 'OSS_BUCKET', 'OSS_ROLE_NAME',
+      'GITHUB_TOKEN', 'DEFAULT_LOCALE',
+      'DEFAULT_MAX_TESTERS', 'DEFAULT_ESTIMATED_MINUTES',
+    ];
+    for (const key of settingKeys) {
+      const match = envContent.match(new RegExp('^' + key + '=["\\'']?(.*?)["\\'']?$', 'm'));
+      if (match && match[1]) {
+        await prisma.setting.upsert({
+          where: { key },
+          update: { value: match[1] },
+          create: { key, value: match[1] },
+        });
+      }
+    }
+    console.log('  Settings seeded from .env');
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+main().catch(e => { console.error('  Warning: could not seed settings:', e.message); });
+`
+  writeFileSync(scriptPath, script)
+  run(`node "${scriptPath}"`, { cwd: appDir, ignoreError: true })
+  try { run(`rm -f "${scriptPath}"`, { ignoreError: true }) } catch {}
+}
+
 // Auto-detect AI provider from environment variables
 function detectAiFromEnv() {
   if (process.env.ANTHROPIC_API_KEY) {
@@ -180,7 +222,7 @@ async function init() {
 
   let mode, dbUrl, providerValue, aiApiKey, aiBaseUrl, aiModel, port, domain
   let smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom
-  let ossRegion, ossBucket, ossRoleName, githubToken
+  let ossRegion, ossBucket, ossRoleName, githubToken, defaultLocale
 
   if (isNonInteractive) {
     // Non-interactive: local mode, auto-detect AI, port 3000, skip everything else
@@ -191,6 +233,7 @@ async function init() {
     smtpHost = ''
     ossRegion = ''
     githubToken = ''
+    defaultLocale = 'en'
 
     const detected = detectAiFromEnv()
     if (detected) {
@@ -301,6 +344,10 @@ async function init() {
 
     // 8. Optional: GitHub token
     githubToken = await ask('GitHub token for code fix PRs (press Enter to skip)')
+
+    // 9. Default language
+    const langChoice = await ask('Default language for AI-generated content (cn/en)', 'en')
+    defaultLocale = langChoice.toLowerCase() === 'cn' ? 'zh' : 'en'
   }
 
   // 5. NEXTAUTH_SECRET
@@ -337,6 +384,7 @@ async function init() {
     if (smtpFrom) envLines.push(`SMTP_FROM="${smtpFrom}"`)
   }
   if (githubToken) envLines.push(`GITHUB_TOKEN="${githubToken}"`)
+  if (defaultLocale) envLines.push(`DEFAULT_LOCALE="${defaultLocale}"`)
   if (ossRegion) {
     envLines.push(`OSS_REGION="${ossRegion}"`)
     envLines.push(`OSS_BUCKET="${ossBucket}"`)
@@ -383,6 +431,9 @@ async function init() {
 
   // ─── Create admin user ───
   createAdminUser(installDir)
+
+  // ─── Seed settings from .env ───
+  seedSettings(installDir)
 
   // ─── Build ───
   console.log('\n  Building application...')

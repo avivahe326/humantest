@@ -1,8 +1,8 @@
 import OSS from 'ali-oss'
 import { randomUUID } from 'crypto'
+import { getConfig } from '@/lib/settings'
 
 const ECS_METADATA_BASE = 'http://100.100.100.200/latest/meta-data/ram/security-credentials'
-const OSS_ROLE_NAME = process.env.OSS_ROLE_NAME || 'humantest'
 
 interface STSCredentials {
   AccessKeyId: string
@@ -11,8 +11,13 @@ interface STSCredentials {
   Expiration: string
 }
 
+async function getOssRoleName(): Promise<string> {
+  return await getConfig('OSS_ROLE_NAME') || 'humantest'
+}
+
 async function fetchSTSFromMetadata(): Promise<STSCredentials> {
-  const res = await fetch(`${ECS_METADATA_BASE}/${OSS_ROLE_NAME}`, {
+  const roleName = await getOssRoleName()
+  const res = await fetch(`${ECS_METADATA_BASE}/${roleName}`, {
     headers: { 'X-aliyun-ecs-metadata-token-ttl-seconds': '900' },
   })
   if (!res.ok) {
@@ -23,20 +28,25 @@ async function fetchSTSFromMetadata(): Promise<STSCredentials> {
 
 let cachedClient: OSS | null = null
 let credentialsExpiry = 0
+let cachedOssConfig = ''
 
 async function getOssClient(): Promise<OSS> {
+  const region = await getConfig('OSS_REGION') || ''
+  const bucket = await getConfig('OSS_BUCKET') || ''
+  const configKey = `${region}:${bucket}`
   const now = Date.now()
-  // Refresh client if no cache or credentials expiring within 5 minutes
-  if (cachedClient && credentialsExpiry > now + 5 * 60 * 1000) {
+
+  if (cachedClient && cachedOssConfig === configKey && credentialsExpiry > now + 5 * 60 * 1000) {
     return cachedClient
   }
 
+  cachedOssConfig = configKey
   const creds = await fetchSTSFromMetadata()
   credentialsExpiry = new Date(creds.Expiration).getTime()
 
   cachedClient = new OSS({
-    region: process.env.OSS_REGION!,
-    bucket: process.env.OSS_BUCKET!,
+    region,
+    bucket,
     accessKeyId: creds.AccessKeyId,
     accessKeySecret: creds.AccessKeySecret,
     stsToken: creds.SecurityToken,
@@ -85,8 +95,8 @@ export async function generatePresignedUrl(
     'Content-Type': contentType,
   } as Parameters<OSS['signatureUrl']>[1])
 
-  const region = process.env.OSS_REGION!
-  const bucket = process.env.OSS_BUCKET!
+  const region = await getConfig('OSS_REGION') || ''
+  const bucket = await getConfig('OSS_BUCKET') || ''
   const objectUrl = `https://${bucket}.${region}.aliyuncs.com/${objectKey}`
 
   return { uploadUrl, objectUrl }

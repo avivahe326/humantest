@@ -1,36 +1,43 @@
 import nodemailer from 'nodemailer'
+import { getConfig } from '@/lib/settings'
 
-const globalForMailer = globalThis as unknown as {
-  mailer: nodemailer.Transporter | undefined
-}
+let cachedTransporter: nodemailer.Transporter | null = null
+let cachedSmtpConfig = ''
 
-function getTransporter(): nodemailer.Transporter {
-  if (globalForMailer.mailer) return globalForMailer.mailer
+async function getTransporter(): Promise<nodemailer.Transporter> {
+  const host = await getConfig('SMTP_HOST') || ''
+  const port = await getConfig('SMTP_PORT') || '465'
+  const user = await getConfig('SMTP_USER') || ''
+  const pass = await getConfig('SMTP_PASS') || ''
+  const configKey = `${host}:${port}:${user}:${pass}`
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 465,
+  if (cachedTransporter && cachedSmtpConfig === configKey) return cachedTransporter
+
+  cachedSmtpConfig = configKey
+  cachedTransporter = nodemailer.createTransport({
+    host,
+    port: Number(port) || 465,
     secure: true,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
+    auth: { user, pass },
   })
 
-  globalForMailer.mailer = transporter
-  return transporter
+  return cachedTransporter
 }
 
 export async function sendVerificationCode(email: string, code: string): Promise<void> {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  const smtpUser = await getConfig('SMTP_USER')
+  const smtpPass = await getConfig('SMTP_PASS')
+
+  if (!smtpUser || !smtpPass) {
     console.log(`[DEV] Verification code for ${email}: ${code}`)
     return
   }
 
-  const transporter = getTransporter()
+  const transporter = await getTransporter()
+  const smtpFrom = await getConfig('SMTP_FROM')
 
   await transporter.sendMail({
-    from: process.env.SMTP_FROM || `"human_test()" <${process.env.SMTP_USER}>`,
+    from: smtpFrom || `"human_test()" <${smtpUser}>`,
     to: email,
     subject: 'human_test() - Email Verification Code',
     text: `Your verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this, please ignore this email.`,

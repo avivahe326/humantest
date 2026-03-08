@@ -4,6 +4,7 @@ import { createTaskSchema, isSafeTargetUrl, isValidRepoUrl } from '@/lib/validat
 import { generateTestPlan } from '@/lib/ai-test-plan'
 import { prisma } from '@/lib/prisma'
 import { RateLimiter, rateLimitResponse } from '@/lib/rate-limit'
+import { getConfig } from '@/lib/settings'
 
 const createTaskLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 10 })
 
@@ -32,12 +33,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid repo URL. Only GitHub and Gitee HTTPS URLs are supported.' }, { status: 400 })
     }
 
-    const maxTesters = data.maxTesters ?? 5
+    const maxTesters = data.maxTesters ?? parseInt(await getConfig('DEFAULT_MAX_TESTERS') || '5')
+    const estimatedMinutes = data.estimatedMinutes ?? parseInt(await getConfig('DEFAULT_ESTIMATED_MINUTES') || '10')
+    const locale = data.locale || await getConfig('DEFAULT_LOCALE') || undefined
 
     let requirements = data.requirements
     if (!requirements) {
       try {
-        requirements = await generateTestPlan(data.url, data.focus, data.estimatedMinutes, undefined, data.locale)
+        requirements = await generateTestPlan(data.url, data.focus, estimatedMinutes, undefined, locale)
       } catch {
         // Fallback: task created without auto-generated plan
       }
@@ -61,8 +64,8 @@ export async function POST(request: NextRequest) {
         focus: data.focus,
         requirements: requirements ?? undefined,
         maxTesters,
-        estimatedMinutes: data.estimatedMinutes ?? 10,
-        locale: data.locale,
+        estimatedMinutes,
+        locale,
         repoUrl: data.repoUrl,
         repoBranch: data.repoBranch,
         creatorId: user!.id,

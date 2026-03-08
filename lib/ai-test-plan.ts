@@ -30,7 +30,7 @@ export async function generateTestPlan(
       },
     ],
     {
-      system: 'You are a UX research expert. Generate structured usability test plans. Always respond with valid JSON only, no markdown wrapping.' + getLanguageInstruction(locale),
+      system: 'You are a UX research expert. Generate structured usability test plans. Always respond with valid JSON only, no markdown wrapping.' + await getLanguageInstruction(locale),
       maxTokens: 1024,
       temperature: 0.7,
       timeoutMs,

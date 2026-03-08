@@ -1,0 +1,77 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { getAllSettings, setSetting } from '@/lib/settings'
+
+const SENSITIVE_KEYS = new Set([
+  'AI_API_KEY', 'ANTHROPIC_API_KEY', 'SMTP_PASS', 'GITHUB_TOKEN',
+])
+
+function maskValue(key: string, value: string): string {
+  if (SENSITIVE_KEYS.has(key) && value.length > 8) {
+    return value.slice(0, 4) + '****' + value.slice(-4)
+  }
+  return value
+}
+
+async function isAdmin(userId: string): Promise<boolean> {
+  const firstUser = await prisma.user.findFirst({
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  })
+  return firstUser?.id === userId
+}
+
+export async function GET() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const admin = await isAdmin(session.user.id)
+  if (!admin) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  }
+
+  const settings = await getAllSettings()
+  const masked: Record<string, string> = {}
+  for (const [key, value] of Object.entries(settings)) {
+    masked[key] = maskValue(key, value)
+  }
+
+  return NextResponse.json({ settings: masked })
+}
+
+export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const admin = await isAdmin(session.user.id)
+  if (!admin) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  }
+
+  try {
+    const body = await request.json()
+    if (typeof body !== 'object' || body === null) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+
+    for (const [key, value] of Object.entries(body)) {
+      if (typeof key !== 'string' || key.length > 100) continue
+      // Skip masked values (user didn't change them)
+      if (typeof value === 'string' && value.includes('****')) continue
+      if (typeof value === 'string') {
+        await setSetting(key, value)
+      }
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Settings update error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

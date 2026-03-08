@@ -1,10 +1,13 @@
 import { createHmac } from 'crypto'
 import { generateObjectKey, MAX_UPLOAD_SIZE } from './oss'
+import { getConfig } from '@/lib/settings'
 
 export { generateObjectKey, MAX_UPLOAD_SIZE }
 
-export function isLocalStorage(): boolean {
-  return !process.env.OSS_REGION || !process.env.OSS_BUCKET
+export async function isLocalStorage(): Promise<boolean> {
+  const region = await getConfig('OSS_REGION')
+  const bucket = await getConfig('OSS_BUCKET')
+  return !region || !bucket
 }
 
 export function getLocalRecordingDir(): string {

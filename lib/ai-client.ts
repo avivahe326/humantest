@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
+import { getConfig } from '@/lib/settings'
 
 // ─── Types ───
 
@@ -49,47 +50,47 @@ interface AIConfig {
   model: string
 }
 
-function resolveConfig(): AIConfig {
-  const provider = (process.env.AI_PROVIDER as AIProvider) || (process.env.ANTHROPIC_API_KEY ? 'anthropic' : undefined)
+async function resolveConfig(): Promise<AIConfig> {
+  const provider = (await getConfig('AI_PROVIDER') as AIProvider | null)
+    || (await getConfig('ANTHROPIC_API_KEY') ? 'anthropic' : null)
 
   if (!provider) {
     throw new Error('AI provider not configured. Set AI_PROVIDER or ANTHROPIC_API_KEY in your environment.')
   }
 
-  const apiKey = process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY || ''
+  const apiKey = await getConfig('AI_API_KEY') || await getConfig('ANTHROPIC_API_KEY') || ''
 
   const defaultModel = provider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o'
-  const model = process.env.AI_MODEL || defaultModel
+  const model = await getConfig('AI_MODEL') || defaultModel
 
-  const baseURL = process.env.AI_BASE_URL || (provider === 'anthropic' ? process.env.ANTHROPIC_BASE_URL : undefined) || undefined
+  const baseURL = await getConfig('AI_BASE_URL')
+    || (provider === 'anthropic' ? await getConfig('ANTHROPIC_BASE_URL') : null)
+    || undefined
 
   return { provider, apiKey, baseURL, model }
 }
 
-// ─── Provider Clients (lazy singletons) ───
+// ─── Provider Clients ───
 
-let cachedConfig: AIConfig | null = null
+let lastConfigJSON = ''
 let anthropicClient: Anthropic | null = null
 let openaiClient: OpenAI | null = null
 
-function getConfig(): AIConfig {
-  if (!cachedConfig) cachedConfig = resolveConfig()
-  return cachedConfig
-}
-
-function getAnthropicClient(): Anthropic {
-  if (!anthropicClient) {
-    const cfg = getConfig()
-    anthropicClient = new Anthropic({ apiKey: cfg.apiKey, baseURL: cfg.baseURL })
-  }
+function getAnthropicClient(cfg: AIConfig): Anthropic {
+  const cfgJSON = JSON.stringify(cfg)
+  if (anthropicClient && lastConfigJSON === cfgJSON) return anthropicClient
+  lastConfigJSON = cfgJSON
+  anthropicClient = new Anthropic({ apiKey: cfg.apiKey, baseURL: cfg.baseURL })
+  openaiClient = null
   return anthropicClient
 }
 
-function getOpenAIClient(): OpenAI {
-  if (!openaiClient) {
-    const cfg = getConfig()
-    openaiClient = new OpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseURL })
-  }
+function getOpenAIClient(cfg: AIConfig): OpenAI {
+  const cfgJSON = JSON.stringify(cfg)
+  if (openaiClient && lastConfigJSON === cfgJSON) return openaiClient
+  lastConfigJSON = cfgJSON
+  openaiClient = new OpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseURL })
+  anthropicClient = null
   return openaiClient
 }
 
@@ -120,7 +121,7 @@ function toOpenAIContent(content: MessageContent): string | OpenAI.Chat.Completi
 // ─── Chat ───
 
 export async function chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<{ text: string }> {
-  const cfg = getConfig()
+  const cfg = await resolveConfig()
 
   if (cfg.provider === 'anthropic') {
     return chatAnthropic(messages, options, cfg)
@@ -129,7 +130,7 @@ export async function chat(messages: ChatMessage[], options: ChatOptions = {}): 
 }
 
 async function chatAnthropic(messages: ChatMessage[], options: ChatOptions, cfg: AIConfig): Promise<{ text: string }> {
-  const client = getAnthropicClient()
+  const client = getAnthropicClient(cfg)
 
   const anthropicMessages: Anthropic.Messages.MessageParam[] = messages.map(m => ({
     role: m.role,
@@ -162,7 +163,7 @@ async function chatAnthropic(messages: ChatMessage[], options: ChatOptions, cfg:
 }
 
 async function chatOpenAI(messages: ChatMessage[], options: ChatOptions, cfg: AIConfig): Promise<{ text: string }> {
-  const client = getOpenAIClient()
+  const client = getOpenAIClient(cfg)
 
   const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = []
 

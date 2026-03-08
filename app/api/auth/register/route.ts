@@ -4,10 +4,9 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { registerWithCodeSchema, registerSchema } from '@/lib/validate'
 import { RateLimiter, getClientIp, rateLimitResponse } from '@/lib/rate-limit'
+import { getConfig } from '@/lib/settings'
 
 const registerLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 5 })
-
-const smtpEnabled = !!process.env.SMTP_HOST
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request)
@@ -18,6 +17,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+    const smtpEnabled = !!(await getConfig('SMTP_HOST'))
 
     if (smtpEnabled) {
       // Cloud mode: require verification code

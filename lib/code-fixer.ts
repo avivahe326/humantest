@@ -2,6 +2,7 @@ import { chat } from '@/lib/ai-client'
 import { prisma } from '@/lib/prisma'
 import { sendCodeFixWebhook } from '@/lib/webhook'
 import { getLanguageInstruction } from '@/lib/ai-locale'
+import { getConfig } from '@/lib/settings'
 import { mkdtemp, readdir, readFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -49,12 +50,13 @@ function parseReportIssues(report: string): ReportIssue[] {
   return issues
 }
 
-function getAuthCloneUrl(repoUrl: string): string {
+async function getAuthCloneUrl(repoUrl: string): Promise<string> {
   const url = new URL(repoUrl)
   const host = url.hostname.toLowerCase()
 
-  if (host === 'github.com' && process.env.GITHUB_TOKEN) {
-    return `https://x-access-token:${process.env.GITHUB_TOKEN}@github.com${url.pathname.replace(/\.git$/, '')}.git`
+  if (host === 'github.com') {
+    const token = await getConfig('GITHUB_TOKEN')
+    if (token) return `https://x-access-token:${token}@github.com${url.pathname.replace(/\.git$/, '')}.git`
   }
   if (host === 'gitee.com' && process.env.GITEE_TOKEN) {
     return `https://oauth2:${process.env.GITEE_TOKEN}@gitee.com${url.pathname.replace(/\.git$/, '')}.git`
@@ -225,7 +227,7 @@ Output format — for each fixable issue:
 
 **Explanation:** Brief description of why this fix addresses the issue.
 
-If an issue cannot be fixed in code (e.g., requires new assets, infrastructure changes, or policy decisions), say so briefly and skip it.` + getLanguageInstruction(locale),
+If an issue cannot be fixed in code (e.g., requires new assets, infrastructure changes, or policy decisions), say so briefly and skip it.` + await getLanguageInstruction(locale),
       maxTokens: 8192,
       temperature: 0.3,
       timeoutMs: 300000,
@@ -354,7 +356,7 @@ These fixes were generated based on real human usability testing feedback from [
 Please review each change carefully before merging.`
 
   if (host === 'github') {
-    const token = process.env.GITHUB_TOKEN
+    const token = await getConfig('GITHUB_TOKEN')
     if (!token) throw new Error('GITHUB_TOKEN not set')
 
     // Get default branch
@@ -450,7 +452,7 @@ export async function runCodeFixAnalysis(taskId: string): Promise<void> {
 
     // 2. Clone repo
     tempDir = await mkdtemp(join(tmpdir(), 'code-fix-'))
-    const cloneUrl = getAuthCloneUrl(task.repoUrl)
+    const cloneUrl = await getAuthCloneUrl(task.repoUrl)
     const cloneArgs = ['clone', '--depth', '1', '--single-branch']
     if (task.repoBranch) {
       cloneArgs.push('--branch', task.repoBranch)

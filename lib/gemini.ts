@@ -186,7 +186,7 @@ Analyze the screenshots carefully. They are in chronological order (one every 3 
 5. **Behavioral Observations** — navigation patterns, page transitions, areas of focus
 6. **Tester Verdict** — overall assessment based on screenshots + written feedback
 
-Use markdown formatting. Be specific about what you observed in each screenshot.${getLanguageInstruction(locale)}`,
+Use markdown formatting. Be specific about what you observed in each screenshot.${await getLanguageInstruction(locale)}`,
       })
 
       const response = await chat(
@@ -227,7 +227,7 @@ Use markdown formatting. Be specific about what you observed in each screenshot.
 
 This is batch ${b + 1}/${batches.length} of screenshots (frames ${frameOffset + 1}-${frameOffset + batch.length} of ${totalFrames} total, one every 3 seconds).
 
-Describe what you observe in these screenshots: what pages/screens are shown, what the user is doing, any signs of confusion or delight, UI issues, and notable interactions. Be specific and reference screenshot numbers.${getLanguageInstruction(locale)}`,
+Describe what you observe in these screenshots: what pages/screens are shown, what the user is doing, any signs of confusion or delight, UI issues, and notable interactions. Be specific and reference screenshot numbers.${await getLanguageInstruction(locale)}`,
       })
 
       const response = await chat(
@@ -261,7 +261,7 @@ Now synthesize all observations into a single cohesive analysis:
 5. **Behavioral Observations** — navigation patterns, page transitions, areas of focus
 6. **Tester Verdict** — overall assessment based on screenshots + written feedback
 
-Use markdown formatting. Be specific and reference timestamps.${getLanguageInstruction(locale)}`,
+Use markdown formatting. Be specific and reference timestamps.${await getLanguageInstruction(locale)}`,
       }],
       { maxTokens: 4096, temperature: 0.3, timeoutMs: 300000 }
     )
@@ -346,7 +346,7 @@ SEVERITY must be one of: CRITICAL, MAJOR, MINOR
 - **P0** (fix immediately): ...
 - **P1** (fix this sprint): ...
 - **P2** (next sprint): ...
-- **P3** (backlog): ...` + getLanguageInstruction(locale)
+- **P3** (backlog): ...` + await getLanguageInstruction(locale)
 
   const response = await chat(
     [{ role: 'user', content: prompt }],

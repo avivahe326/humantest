@@ -108,7 +108,7 @@ IMPORTANT: Follow this exact output format so AI agents can reliably parse the r
    - Impact: how it affects users
    - Recommendation: specific fix
 
-4. For recommendations, use priority tags: P0 (fix immediately), P1 (fix this sprint), P2 (next sprint), P3 (backlog)` + getLanguageInstruction(task.locale),
+4. For recommendations, use priority tags: P0 (fix immediately), P1 (fix this sprint), P2 (next sprint), P3 (backlog)` + await getLanguageInstruction(task.locale),
       maxTokens: 4096,
       temperature: 0.5,
       timeoutMs,

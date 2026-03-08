@@ -106,3 +106,9 @@ model EmailVerificationCode {
   @@index([email, code])
   @@index([expiresAt])
 }
+
+model Setting {
+  key       String   @id @db.VarChar(100)
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
