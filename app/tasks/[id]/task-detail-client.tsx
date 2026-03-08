@@ -158,6 +158,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const [cancelling, setCancelling] = useState(false)
   const [generatingReport, setGeneratingReport] = useState(false)
   const [generatingCodeFix, setGeneratingCodeFix] = useState(false)
+  const [hasGithubToken, setHasGithubToken] = useState(false)
   const [error, setError] = useState('')
   const [reportStatus, setReportStatus] = useState(task.reportStatus)
   const [report, setReport] = useState(task.report)
@@ -172,6 +173,14 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
   let hostname = ''
   try { hostname = new URL(task.targetUrl).hostname } catch {}
+
+  // Fetch server config (GitHub token availability)
+  useEffect(() => {
+    if (!isCreator || !task.repoUrl) return
+    fetch('/api/config').then(r => r.json()).then(data => {
+      setHasGithubToken(!!data.hasGithubToken)
+    }).catch(() => {})
+  }, [isCreator, task.repoUrl])
 
   const isGenerating = reportStatus === 'GENERATING'
   const isCodeFixing = codeFixStatus === 'GENERATING'
@@ -416,7 +425,7 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
                 {generatingReport ? t('taskDetail.starting') : t('taskDetail.generateReport')}
               </Button>
             )}
-            {report && task.repoUrl && !codeFixPrUrl && !isCodeFixing && codeFixStatus !== 'GENERATING' && (
+            {report && task.repoUrl && hasGithubToken && !codeFixPrUrl && !isCodeFixing && codeFixStatus !== 'GENERATING' && (
               <Button onClick={handleGenerateCodeFix} disabled={generatingCodeFix} variant="secondary">
                 {generatingCodeFix ? t('taskDetail.starting') : t('taskDetail.generateCodeFix')}
               </Button>
