@@ -164,8 +164,12 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
   const [report, setReport] = useState(task.report)
   const [codeFixStatus, setCodeFixStatus] = useState(task.codeFixStatus)
   const [codeFixPrUrl, setCodeFixPrUrl] = useState(task.codeFixPrUrl)
-  const [progress, setProgress] = useState(0)
-  const [codeFixProgress, setCodeFixProgress] = useState(0)
+  const [progress, setProgress] = useState(
+    task.reportStatus === 'COMPLETED' ? 100 : task.reportStatus === 'GENERATING' ? 5 : 0
+  )
+  const [codeFixProgress, setCodeFixProgress] = useState(
+    task.codeFixStatus === 'COMPLETED' ? 100 : task.codeFixStatus === 'GENERATING' ? 5 : 0
+  )
   const [feedbackStatuses, setFeedbackStatuses] = useState<FeedbackStatusInfo[]>([])
   const [expandedFeedbacks, setExpandedFeedbacks] = useState<Set<string>>(new Set())
   const startTimeRef = useRef<number | null>(null)
@@ -262,6 +266,9 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
 
         if (data.codeFixStatus) {
           setCodeFixStatus(data.codeFixStatus)
+          if (data.codeFixStatus === 'GENERATING' && data.updatedAt) {
+            codeFixStartTimeRef.current = new Date(data.updatedAt).getTime()
+          }
         }
         if (data.codeFixPrUrl) {
           setCodeFixPrUrl(data.codeFixPrUrl)
