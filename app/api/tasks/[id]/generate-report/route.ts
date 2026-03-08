@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/require-auth'
 import { prisma } from '@/lib/prisma'
-import { startReportGeneration } from '@/lib/ai-report'
+import { startReportGeneration, generateReport } from '@/lib/ai-report'
 
 export async function POST(
   request: NextRequest,
@@ -25,11 +25,11 @@ export async function POST(
       if (task.status === 'CANCELLED') throw { appCode: 'CONFLICT', currentStatus: 'CANCELLED' }
       if (task.status === 'COMPLETED' && task.report !== null && !regenerate) throw { appCode: 'REPORT_EXISTS' }
 
-      // Regenerate path: clear existing report
+      // Regenerate path: clear existing report and set GENERATING immediately
       if (task.status === 'COMPLETED' && task.report !== null && regenerate) {
         await tx.task.update({
           where: { id },
-          data: { report: null, reportStatus: null },
+          data: { report: null, reportStatus: 'GENERATING', codeFixStatus: null, codeFixPrUrl: null },
         })
         // Reset media analysis status so it re-analyzes
         await tx.feedback.updateMany({
@@ -64,7 +64,20 @@ export async function POST(
     }, { timeout: 10000 })
 
     // Generate report outside transaction (AI API call is long-running)
-    // Check if already generating
+    if (regenerate) {
+      // Regenerate path: reportStatus already set to GENERATING in transaction,
+      // call generateReport directly (skip startReportGeneration's guard)
+      generateReport(id).catch((err) => {
+        console.error('Report regeneration failed for task:', id, err)
+        prisma.task.update({
+          where: { id },
+          data: { reportStatus: 'FAILED' },
+        }).catch(() => {})
+      })
+      return NextResponse.json({ started: true })
+    }
+
+    // Normal path: check if already generating
     const currentTask = await prisma.task.findUnique({
       where: { id },
       select: { reportStatus: true, updatedAt: true },

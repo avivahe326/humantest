@@ -297,6 +297,8 @@ export function TaskDetailClient({ task, isLoggedIn, isCreator, userClaim, feedb
     if (regenerate) {
       setReport(null)
       setReportStatus('GENERATING')
+      setCodeFixStatus(null)
+      setCodeFixPrUrl(null)
       setProgress(0)
     }
     try {
